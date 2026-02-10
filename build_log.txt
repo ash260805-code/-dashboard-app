@@ -1,82 +1,61 @@
-﻿Γû▓ Next.js 16.1.6 (Turbopack)
+﻿
+> dashboard-app@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.1.6 (Turbopack)
 - Environments: .env.local, .env
 
 node.exe : ΓÜá The 
 "middleware" file 
-convention is 
-deprecated. Please 
-use "proxy" instead. 
-Learn more: https://n
-extjs.org/docs/messag
-es/middleware-to-prox
-y
+convention is deprecated. 
+Please use "proxy" instead. 
+Learn more: https://nextjs.o
+rg/docs/messages/middleware-
+to-proxy
 At line:1 char:1
-+ & "C:\Program Files
-\nodejs/node.exe" 
++ & "C:\Program 
+Files\nodejs/node.exe" 
 "C:\Program 
-Files\nodejs/node_mo 
-...
-+ ~~~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~~~~~~~~
-~~~~~~~~
-    + CategoryInfo   
-           : NotSpe  
-  cified: (ΓÜá The   
-  "middle...lewar    
-e-to-proxy:Strin    
-g) [], RemoteExc    
-eption
-    + FullyQualified 
-   ErrorId : Native  
-  CommandError
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
+    + CategoryInfo          
+    : NotSpecified: (ΓÜá T  
+  he "middle...leware-to-   
+ proxy:String) [], Remot    
+eException
+    + FullyQualifiedErrorId 
+    : NativeCommandError
  
   Creating an optimized production build ...
-Γ£ô Compiled successfully in 4.5s
+Γ£ô Compiled successfully in 2.6s
   Running TypeScript ...
-Failed to compile.
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/13) ...
+  Generating static pages using 15 workers (3/13) 
+  Generating static pages using 15 workers (6/13) 
+  Generating static pages using 15 workers (9/13) 
+Γ£ô Generating static pages using 15 workers (13/13) in 435.2ms
+  Finalizing page optimization ...
 
-./src/app/api/summari
-ze/route.ts:42:119
-Type error: This 
-regular expression 
-flag is only 
-available when 
-targeting 'es2018' 
-or later.
+Route (app)
+Γöî Γùï /
+Γö£ Γùï /_not-found
+Γö£ Γùï /admin
+Γö£ ╞Æ /api/admin/users
+Γö£ ╞Æ /api/auth/[...nextauth]
+Γö£ ╞Æ /api/register
+Γö£ ╞Æ /api/summarize
+Γö£ ╞Æ /dashboard
+Γö£ Γùï /dashboard/ai-tools
+Γö£ Γùï /login
+Γö£ ╞Æ /pending
+Γöö Γùï /signup
 
-[0m [90m 40 |[39m
- [90m 41 |[39m     
-[90m// Extract 
-captions JSON from 
-the page[39m
-[31m[1m>[22m[39m
-[90m 42 |[39m     
-[36mconst[39m 
-captionMatch 
-[33m=[39m html[33m
-.[39mmatch([35m/"ca
-ptions":\s*(\{.*?"pla
-yerCaptionsTracklistR
-enderer".*?\})\s*,\s*
-"videoDetails"/s[39m
-)[33m;[39m
- [90m    |[39m     
-                     
-                     
-                     
-                     
-                     
-         
-[31m[1m^[22m[39m
- [90m 43 |[39m
- [90m 44 |[39m     
-[36mif[39m ([33m!
-[39mcaptionMatch) {
- [90m 45 |[39m     
-    [90m// Try 
-alternative 
-pattern[39m[0m
-Next.js build worker 
-exited with code: 1 
-and signal: null
+
+╞Æ Proxy (Middleware)
+
+Γùï  (Static)   prerendered as static content
+╞Æ  (Dynamic)  server-rendered on demand
+

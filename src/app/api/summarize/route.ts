@@ -20,7 +20,7 @@ function extractVideoId(url: string): string | null {
 }
 
 async function fetchTranscript(videoId: string): Promise<string> {
-    // Fetch the YouTube video page to get caption track info
+    // Step 1: Fetch the YouTube video page with consent cookie to bypass cookie wall
     const videoPageResponse = await fetch(
         `https://www.youtube.com/watch?v=${videoId}`,
         {
@@ -28,73 +28,95 @@ async function fetchTranscript(videoId: string): Promise<string> {
                 "User-Agent":
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Accept-Language": "en-US,en;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Cookie": "CONSENT=PENDING+987; SOCS=CAISNQgDEitib3FfaWRlbnRpdHlmcm9udGVuZHVpc2VydmVyXzIwMjMxMjE5LjA3X3AxGgJlbiACGgYIgJnsBhAB",
             },
         }
     );
 
     if (!videoPageResponse.ok) {
-        throw new Error("Failed to fetch video page");
+        throw new Error(`Failed to fetch video page: ${videoPageResponse.status}`);
     }
 
     const html = await videoPageResponse.text();
 
-    // Extract captions JSON from the page
-    const captionMatch = html.match(/"captions":\s*(\{[\s\S]*?"playerCaptionsTracklistRenderer"[\s\S]*?\})\s*,\s*"videoDetails"/);
+    // Step 2: Extract ytInitialPlayerResponse JSON from the page
+    const playerResponseMatch = html.match(/var ytInitialPlayerResponse\s*=\s*(\{.+?\});/);
 
-    if (!captionMatch) {
-        // Try alternative pattern
-        const altMatch = html.match(/"captionTracks":\s*(\[[\s\S]*?\])/);
-        if (!altMatch) {
-            throw new Error("No captions found");
-        }
+    let captionUrl: string | null = null;
 
+    if (playerResponseMatch) {
         try {
-            const tracks = JSON.parse(altMatch[1]);
-            if (tracks.length === 0) throw new Error("No caption tracks");
+            const playerResponse = JSON.parse(playerResponseMatch[1]);
+            const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
 
-            const captionUrl = tracks[0].baseUrl;
-            return await fetchCaptionContent(captionUrl);
+            if (tracks && tracks.length > 0) {
+                // Prefer English, fallback to first available
+                const englishTrack = tracks.find(
+                    (t: { languageCode: string }) =>
+                        t.languageCode === "en" || t.languageCode?.startsWith("en")
+                );
+                captionUrl = (englishTrack || tracks[0]).baseUrl;
+            }
         } catch {
-            throw new Error("Failed to parse caption tracks");
+            // JSON parse failed, try regex fallback
         }
     }
 
-    try {
-        const captionsData = JSON.parse(captionMatch[1]);
-        const tracks = captionsData?.playerCaptionsTracklistRenderer?.captionTracks;
-
-        if (!tracks || tracks.length === 0) {
-            throw new Error("No caption tracks available");
+    // Step 3: Fallback — try to find captionTracks directly
+    if (!captionUrl) {
+        const trackMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
+        if (trackMatch) {
+            try {
+                const tracks = JSON.parse(trackMatch[1]);
+                if (tracks.length > 0) {
+                    const englishTrack = tracks.find(
+                        (t: { languageCode: string }) =>
+                            t.languageCode === "en" || t.languageCode?.startsWith("en")
+                    );
+                    captionUrl = (englishTrack || tracks[0]).baseUrl;
+                }
+            } catch {
+                // parse failed
+            }
         }
-
-        // Prefer English, fallback to first available
-        const englishTrack = tracks.find(
-            (t: { languageCode: string }) => t.languageCode === "en" || t.languageCode?.startsWith("en")
-        );
-        const selectedTrack = englishTrack || tracks[0];
-        const captionUrl = selectedTrack.baseUrl;
-
-        return await fetchCaptionContent(captionUrl);
-    } catch {
-        throw new Error("Failed to parse captions data");
     }
-}
 
-async function fetchCaptionContent(captionUrl: string): Promise<string> {
-    const captionResponse = await fetch(captionUrl);
+    // Step 4: Another fallback — find baseUrl for timedtext
+    if (!captionUrl) {
+        const timedTextMatch = html.match(/"baseUrl"\s*:\s*"(https:\/\/www\.youtube\.com\/api\/timedtext[^"]+)"/);
+        if (timedTextMatch) {
+            captionUrl = timedTextMatch[1].replace(/\\u0026/g, "&");
+        }
+    }
+
+    if (!captionUrl) {
+        throw new Error("No captions found for this video");
+    }
+
+    // Decode any escaped characters in the URL
+    captionUrl = captionUrl.replace(/\\u0026/g, "&").replace(/\\u003d/g, "=");
+
+    // Step 5: Fetch the caption content
+    const captionResponse = await fetch(captionUrl, {
+        headers: {
+            "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+    });
+
     if (!captionResponse.ok) {
-        throw new Error("Failed to fetch caption content");
+        throw new Error(`Failed to fetch captions: ${captionResponse.status}`);
     }
 
     const captionXml = await captionResponse.text();
 
-    // Parse the XML to extract text
+    // Step 6: Parse the XML to extract text
     const textSegments: string[] = [];
     const regex = /<text[^>]*>([\s\S]*?)<\/text>/g;
     let match;
 
     while ((match = regex.exec(captionXml)) !== null) {
-        // Decode HTML entities
         let text = match[1]
             .replace(/&amp;/g, "&")
             .replace(/&lt;/g, "<")
@@ -145,7 +167,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Fetch transcript using custom fetcher
+        // Fetch transcript
         let transcriptText: string;
         try {
             transcriptText = await fetchTranscript(videoId);
