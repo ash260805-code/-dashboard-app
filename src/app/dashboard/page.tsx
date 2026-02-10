@@ -1,6 +1,7 @@
 import { auth, signOut } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/db";
+import Link from "next/link";
 
 async function getStats() {
     const [totalUsers, approvedUsers, pendingUsers, recentUsers] = await Promise.all([
@@ -126,6 +127,28 @@ export default async function DashboardPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* AI Tools Card */}
+                <Link href="/dashboard/ai-tools" className="block mb-8 group">
+                    <div className="backdrop-blur-xl bg-gradient-to-r from-pink-500/10 via-violet-500/10 to-purple-500/10 border border-violet-500/30 rounded-2xl p-6 hover:border-violet-400/50 transition-all">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-14 h-14 rounded-xl bg-gradient-to-tr from-pink-500 to-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-white">🎥 AI YouTube Summarizer</h2>
+                                    <p className="text-gray-400">Paste a YouTube link → Get AI-powered summary & study notes</p>
+                                </div>
+                            </div>
+                            <svg className="w-6 h-6 text-violet-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                        </div>
+                    </div>
+                </Link>
 
                 {/* Recent Users */}
                 <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
