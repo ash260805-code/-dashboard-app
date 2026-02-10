@@ -19,85 +19,59 @@ function extractVideoId(url: string): string | null {
     return null;
 }
 
-async function fetchTranscript(videoId: string): Promise<string> {
-    // Step 1: Fetch the YouTube video page with consent cookie to bypass cookie wall
-    const videoPageResponse = await fetch(
-        `https://www.youtube.com/watch?v=${videoId}`,
+async function fetchTranscriptViaInnertube(videoId: string): Promise<string> {
+    // Step 1: Use YouTube's Innertube Player API to get caption track URLs
+    const playerResponse = await fetch(
+        "https://www.youtube.com/youtubei/v1/player",
         {
+            method: "POST",
             headers: {
+                "Content-Type": "application/json",
                 "User-Agent":
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Cookie": "CONSENT=PENDING+987; SOCS=CAISNQgDEitib3FfaWRlbnRpdHlmcm9udGVuZHVpc2VydmVyXzIwMjMxMjE5LjA3X3AxGgJlbiACGgYIgJnsBhAB",
             },
+            body: JSON.stringify({
+                videoId: videoId,
+                context: {
+                    client: {
+                        clientName: "WEB",
+                        clientVersion: "2.20240101.00.00",
+                        hl: "en",
+                        gl: "US",
+                    },
+                },
+            }),
         }
     );
 
-    if (!videoPageResponse.ok) {
-        throw new Error(`Failed to fetch video page: ${videoPageResponse.status}`);
+    if (!playerResponse.ok) {
+        throw new Error(`Innertube player API failed: ${playerResponse.status}`);
     }
 
-    const html = await videoPageResponse.text();
+    const playerData = await playerResponse.json();
 
-    // Step 2: Extract ytInitialPlayerResponse JSON from the page
-    const playerResponseMatch = html.match(/var ytInitialPlayerResponse\s*=\s*(\{.+?\});/);
+    // Step 2: Extract caption tracks
+    const captionTracks =
+        playerData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
 
-    let captionUrl: string | null = null;
-
-    if (playerResponseMatch) {
-        try {
-            const playerResponse = JSON.parse(playerResponseMatch[1]);
-            const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-
-            if (tracks && tracks.length > 0) {
-                // Prefer English, fallback to first available
-                const englishTrack = tracks.find(
-                    (t: { languageCode: string }) =>
-                        t.languageCode === "en" || t.languageCode?.startsWith("en")
-                );
-                captionUrl = (englishTrack || tracks[0]).baseUrl;
-            }
-        } catch {
-            // JSON parse failed, try regex fallback
-        }
+    if (!captionTracks || captionTracks.length === 0) {
+        throw new Error("No captions available for this video");
     }
 
-    // Step 3: Fallback — try to find captionTracks directly
-    if (!captionUrl) {
-        const trackMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
-        if (trackMatch) {
-            try {
-                const tracks = JSON.parse(trackMatch[1]);
-                if (tracks.length > 0) {
-                    const englishTrack = tracks.find(
-                        (t: { languageCode: string }) =>
-                            t.languageCode === "en" || t.languageCode?.startsWith("en")
-                    );
-                    captionUrl = (englishTrack || tracks[0]).baseUrl;
-                }
-            } catch {
-                // parse failed
-            }
-        }
+    // Prefer English, fallback to first available
+    const englishTrack = captionTracks.find(
+        (t: { languageCode: string }) =>
+            t.languageCode === "en" || t.languageCode?.startsWith("en")
+    );
+    const selectedTrack = englishTrack || captionTracks[0];
+    let captionUrl: string = selectedTrack.baseUrl;
+
+    // Ensure we get the XML format
+    if (!captionUrl.includes("fmt=")) {
+        captionUrl += "&fmt=srv3";
     }
 
-    // Step 4: Another fallback — find baseUrl for timedtext
-    if (!captionUrl) {
-        const timedTextMatch = html.match(/"baseUrl"\s*:\s*"(https:\/\/www\.youtube\.com\/api\/timedtext[^"]+)"/);
-        if (timedTextMatch) {
-            captionUrl = timedTextMatch[1].replace(/\\u0026/g, "&");
-        }
-    }
-
-    if (!captionUrl) {
-        throw new Error("No captions found for this video");
-    }
-
-    // Decode any escaped characters in the URL
-    captionUrl = captionUrl.replace(/\\u0026/g, "&").replace(/\\u003d/g, "=");
-
-    // Step 5: Fetch the caption content
+    // Step 3: Fetch the caption XML
     const captionResponse = await fetch(captionUrl, {
         headers: {
             "User-Agent":
@@ -111,7 +85,7 @@ async function fetchTranscript(videoId: string): Promise<string> {
 
     const captionXml = await captionResponse.text();
 
-    // Step 6: Parse the XML to extract text
+    // Step 4: Parse the XML to extract text
     const textSegments: string[] = [];
     const regex = /<text[^>]*>([\s\S]*?)<\/text>/g;
     let match;
@@ -132,7 +106,7 @@ async function fetchTranscript(videoId: string): Promise<string> {
     }
 
     if (textSegments.length === 0) {
-        throw new Error("No text found in captions");
+        throw new Error("No text found in captions XML");
     }
 
     return textSegments.join(" ");
@@ -167,10 +141,10 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Fetch transcript
+        // Fetch transcript via Innertube API
         let transcriptText: string;
         try {
-            transcriptText = await fetchTranscript(videoId);
+            transcriptText = await fetchTranscriptViaInnertube(videoId);
         } catch (err) {
             console.error("Transcript fetch error:", err);
             return NextResponse.json(

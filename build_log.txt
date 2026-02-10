@@ -7,26 +7,33 @@
 
 node.exe : ΓÜá The 
 "middleware" file 
-convention is deprecated. 
-Please use "proxy" instead. 
-Learn more: https://nextjs.o
-rg/docs/messages/middleware-
-to-proxy
+convention is 
+deprecated. Please 
+use "proxy" instead. 
+Learn more: https://n
+extjs.org/docs/messag
+es/middleware-to-prox
+y
 At line:1 char:1
-+ & "C:\Program 
-Files\nodejs/node.exe" 
++ & "C:\Program Files
+\nodejs/node.exe" 
 "C:\Program 
-Files\nodejs/node_mo ...
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~~
-    + CategoryInfo          
-    : NotSpecified: (ΓÜá T  
-  he "middle...leware-to-   
- proxy:String) [], Remot    
-eException
-    + FullyQualifiedErrorId 
-    : NativeCommandError
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (ΓÜá The   
+  "middle...lewar    
+e-to-proxy:Strin    
+g) [], RemoteExc    
+eption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
  
   Creating an optimized production build ...
 Γ£ô Compiled successfully in 2.6s
@@ -36,7 +43,7 @@ eException
   Generating static pages using 15 workers (3/13) 
   Generating static pages using 15 workers (6/13) 
   Generating static pages using 15 workers (9/13) 
-Γ£ô Generating static pages using 15 workers (13/13) in 435.2ms
+Γ£ô Generating static pages using 15 workers (13/13) in 430.7ms
   Finalizing page optimization ...
 
 Route (app)
