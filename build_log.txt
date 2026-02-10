@@ -1,0 +1,82 @@
+﻿Γû▓ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local, .env
+
+node.exe : ΓÜá The 
+"middleware" file 
+convention is 
+deprecated. Please 
+use "proxy" instead. 
+Learn more: https://n
+extjs.org/docs/messag
+es/middleware-to-prox
+y
+At line:1 char:1
++ & "C:\Program Files
+\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (ΓÜá The   
+  "middle...lewar    
+e-to-proxy:Strin    
+g) [], RemoteExc    
+eption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 4.5s
+  Running TypeScript ...
+Failed to compile.
+
+./src/app/api/summari
+ze/route.ts:42:119
+Type error: This 
+regular expression 
+flag is only 
+available when 
+targeting 'es2018' 
+or later.
+
+[0m [90m 40 |[39m
+ [90m 41 |[39m     
+[90m// Extract 
+captions JSON from 
+the page[39m
+[31m[1m>[22m[39m
+[90m 42 |[39m     
+[36mconst[39m 
+captionMatch 
+[33m=[39m html[33m
+.[39mmatch([35m/"ca
+ptions":\s*(\{.*?"pla
+yerCaptionsTracklistR
+enderer".*?\})\s*,\s*
+"videoDetails"/s[39m
+)[33m;[39m
+ [90m    |[39m     
+                     
+                     
+                     
+                     
+                     
+         
+[31m[1m^[22m[39m
+ [90m 43 |[39m
+ [90m 44 |[39m     
+[36mif[39m ([33m!
+[39mcaptionMatch) {
+ [90m 45 |[39m     
+    [90m// Try 
+alternative 
+pattern[39m[0m
+Next.js build worker 
+exited with code: 1 
+and signal: null
