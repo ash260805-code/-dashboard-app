@@ -2,27 +2,26 @@ import { auth, signOut } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/db";
 
-async function getStats(userId: string) {
-    const [transactionCount, transactions, allTransactions] = await Promise.all([
-        prisma.financialTransaction.count({
-            where: { userId },
+async function getStats() {
+    const [totalUsers, approvedUsers, pendingUsers, recentUsers] = await Promise.all([
+        prisma.user.count(),
+        prisma.user.count({
+            where: { status: "APPROVED" },
         }),
-        prisma.financialTransaction.findMany({
-            where: { userId },
+        prisma.user.count({
+            where: { status: "PENDING" },
+        }),
+        prisma.user.findMany({
             orderBy: { createdAt: "desc" },
-            take: 5,
-        }),
-        prisma.financialTransaction.findMany({
-            where: { userId, status: "COMPLETED" },
+            take: 10,
         }),
     ]);
 
-    const totalRevenue = allTransactions.reduce((acc, curr) => acc + curr.amount, 0);
-
     return {
-        transactionCount,
-        recentTransactions: transactions,
-        revenue: totalRevenue,
+        totalUsers,
+        approvedUsers,
+        pendingUsers,
+        recentUsers,
     };
 }
 
@@ -37,7 +36,7 @@ export default async function DashboardPage() {
         redirect("/pending");
     }
 
-    const stats = await getStats(session.user.id);
+    const stats = await getStats();
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -89,12 +88,12 @@ export default async function DashboardPage() {
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-500 to-cyan-500 flex items-center justify-center">
                                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                                 </svg>
                             </div>
                             <div>
-                                <p className="text-gray-400 text-sm">Total Transactions</p>
-                                <p className="text-2xl font-bold text-white">{stats.transactionCount}</p>
+                                <p className="text-gray-400 text-sm">Total Users</p>
+                                <p className="text-2xl font-bold text-white">{stats.totalUsers}</p>
                             </div>
                         </div>
                     </div>
@@ -103,63 +102,66 @@ export default async function DashboardPage() {
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-500 to-green-500 flex items-center justify-center">
                                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                             </div>
                             <div>
-                                <p className="text-gray-400 text-sm">Total Revenue</p>
-                                <p className="text-2xl font-bold text-white">
-                                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(stats.revenue)}
-                                </p>
+                                <p className="text-gray-400 text-sm">Approved Users</p>
+                                <p className="text-2xl font-bold text-white">{stats.approvedUsers}</p>
                             </div>
                         </div>
                     </div>
 
                     <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-violet-500 to-purple-500 flex items-center justify-center">
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center">
                                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                             </div>
                             <div>
-                                <p className="text-gray-400 text-sm">Account Status</p>
-                                <p className="text-2xl font-bold text-white">{session.user.status}</p>
+                                <p className="text-gray-400 text-sm">Pending Users</p>
+                                <p className="text-2xl font-bold text-white">{stats.pendingUsers}</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Recent Activity */}
+                {/* Recent Users */}
                 <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
-                    <h2 className="text-xl font-bold text-white mb-4">Recent Transactions</h2>
+                    <h2 className="text-xl font-bold text-white mb-4">Recent Users</h2>
                     <div className="space-y-4">
-                        {stats.recentTransactions.map((transaction) => (
-                            <div key={transaction.id} className="flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${transaction.status === "COMPLETED" ? "bg-emerald-500/20 text-emerald-300" :
-                                    transaction.status === "PENDING" ? "bg-amber-500/20 text-amber-300" :
+                        {stats.recentUsers.map((user) => (
+                            <div key={user.id} className="flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.status === "APPROVED" ? "bg-emerald-500/20 text-emerald-300" :
+                                    user.status === "PENDING" ? "bg-amber-500/20 text-amber-300" :
                                         "bg-red-500/20 text-red-300"
                                     }`}>
-                                    {transaction.status === "COMPLETED" ? "✓" : transaction.status === "PENDING" ? "⏳" : "✕"}
+                                    {user.name ? user.name.charAt(0).toUpperCase() : "U"}
                                 </div>
                                 <div className="flex-1">
                                     <p className="text-white font-medium">
-                                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(transaction.amount)}
+                                        {user.name || "Unnamed User"}
                                     </p>
                                     <p className="text-gray-400 text-sm">
-                                        {new Date(transaction.createdAt).toLocaleDateString()}
+                                        {user.email} · Joined {new Date(user.createdAt).toLocaleDateString()}
                                     </p>
                                 </div>
-                                <div className={`px-3 py-1 rounded-full text-xs border ${transaction.status === "COMPLETED" ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" :
-                                    transaction.status === "PENDING" ? "bg-amber-500/20 text-amber-300 border-amber-500/30" :
+                                <div className={`px-3 py-1 rounded-full text-xs border ${user.role === "ADMIN" ? "bg-violet-500/20 text-violet-300 border-violet-500/30" :
+                                    "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                                    }`}>
+                                    {user.role}
+                                </div>
+                                <div className={`px-3 py-1 rounded-full text-xs border ${user.status === "APPROVED" ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" :
+                                    user.status === "PENDING" ? "bg-amber-500/20 text-amber-300 border-amber-500/30" :
                                         "bg-red-500/20 text-red-300 border-red-500/30"
                                     }`}>
-                                    {transaction.status}
+                                    {user.status}
                                 </div>
                             </div>
                         ))}
-                        {stats.recentTransactions.length === 0 && (
-                            <p className="text-gray-400 text-center py-4">No transactions found</p>
+                        {stats.recentUsers.length === 0 && (
+                            <p className="text-gray-400 text-center py-4">No users found</p>
                         )}
                     </div>
                 </div>
