@@ -247,6 +247,12 @@ async function fetchViaPiped(videoId: string): Promise<string> {
         "https://piped-api.lunar.icu",
         "https://pipedapi.drgns.space",
         "https://api.piped.yt",
+        "https://piped-api.garudalinux.org",
+        "https://pa.il.ax",
+        "https://p.odyssey346.dev",
+        "https://api.piped.projectsegfau.lt",
+        "https://pipedapi.system41.xyz",
+        "https://api.piped.zing.studio",
     ];
 
     console.log(`[Transcript] Trying Piped fallback (${instances.length} instances parallel)...`);
@@ -255,7 +261,7 @@ async function fetchViaPiped(videoId: string): Promise<string> {
     const fetchOne = async (instance: string): Promise<string> => {
         try {
             const res = await fetch(`${instance}/streams/${videoId}`, {
-                signal: AbortSignal.timeout(6000),
+                signal: AbortSignal.timeout(8000),
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -266,7 +272,7 @@ async function fetchViaPiped(videoId: string): Promise<string> {
             const enTrack = subtitles.find((s: any) => s.code === "en" || s.code?.startsWith("en") || s.name?.toLowerCase().includes("english"));
             const track = enTrack || subtitles[0];
 
-            const subRes = await fetch(track.url, { signal: AbortSignal.timeout(6000) });
+            const subRes = await fetch(track.url, { signal: AbortSignal.timeout(8000) });
             if (!subRes.ok) throw new Error("Failed to fetch subtitle content");
 
             const text = await subRes.text();
@@ -310,6 +316,11 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
         "https://vid.puffyan.us",
         "https://yewtu.be",
         "https://yt.artemislena.eu",
+        "https://invidious.privacydev.net",
+        "https://iv.ggtyler.dev",
+        "https://invidious.lunar.icu",
+        "https://inv.nadeko.net",
+        "https://invidious.protokolla.fi",
     ];
 
     console.log(`[Transcript] Trying Invidious fallback (${instances.length} instances parallel)...`);
@@ -319,7 +330,7 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
         try {
             // Step 1: Get caption tracks
             const res = await fetch(`${instance}/api/v1/captions/${videoId}`, {
-                signal: AbortSignal.timeout(6000),
+                signal: AbortSignal.timeout(8000),
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -333,7 +344,7 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
             // Step 3: Fetch content
             const contentUrl = `${instance}${track.url}`;
             const subRes = await fetch(contentUrl, {
-                signal: AbortSignal.timeout(6000),
+                signal: AbortSignal.timeout(8000),
             });
             if (!subRes.ok) throw new Error("Failed to fetch caption content");
 
@@ -376,7 +387,6 @@ async function fetchTranscript(videoId: string): Promise<string> {
     try {
         return await fetchViaInnertube(videoId);
     } catch (e: any) {
-        // Clean up innerTube error messages
         const msg = e.message.length > 100 ? e.message.substring(0, 100) + "..." : e.message;
         debugLogs.push(`Innertube: ${msg}`);
         console.warn(`[Transcript] Innertube methods failed: ${msg}`);
