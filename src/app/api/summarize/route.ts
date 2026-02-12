@@ -3,17 +3,24 @@ import { auth } from "@/lib/auth";
 
 // robust fetch helper with no caching and browser headers
 async function fetchWithNoCache(url: string, options: RequestInit = {}): Promise<Response> {
-    const headers: Record<string, string> = {
+    const defaultHeaders: Record<string, string> = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",
         "Expires": "0",
-        ...(options.headers as Record<string, string>),
     };
+
+    const inputHeaders = (options.headers as Record<string, string>) || {};
+    const finalHeaders = { ...defaultHeaders, ...inputHeaders };
+
+    // Allow removing headers by passing empty string
+    // If input header is explicit empty string, we keep it as empty? Or remove it?
+    // Node-fetch might send empty header. 
+    // Let's just use what's passed.
 
     return fetch(url, {
         ...options,
-        headers,
+        headers: finalHeaders,
         cache: "no-store", // Critical for Vercel/Next.js
         next: { revalidate: 0 }, // For Next.js 13+
     });
@@ -277,8 +284,11 @@ async function fetchViaPiped(videoId: string): Promise<string> {
     // Helper to fetch from a single instance
     const fetchOne = async (instance: string): Promise<string> => {
         try {
+            // NOTE: We passing empty User-Agent to mimic API environment, 
+            // as some Piped instances block browser UAs.
             const res = await fetchWithNoCache(`${instance}/streams/${videoId}`, {
                 signal: AbortSignal.timeout(8000),
+                headers: { "User-Agent": "" }
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -289,7 +299,10 @@ async function fetchViaPiped(videoId: string): Promise<string> {
             const enTrack = subtitles.find((s: any) => s.code === "en" || s.code?.startsWith("en") || s.name?.toLowerCase().includes("english"));
             const track = enTrack || subtitles[0];
 
-            const subRes = await fetchWithNoCache(track.url, { signal: AbortSignal.timeout(8000) });
+            const subRes = await fetchWithNoCache(track.url, {
+                signal: AbortSignal.timeout(8000),
+                headers: { "User-Agent": "" }
+            });
             if (!subRes.ok) throw new Error("Failed to fetch subtitle content");
 
             const text = await subRes.text();
@@ -346,8 +359,10 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
     const fetchOne = async (instance: string): Promise<string> => {
         try {
             // Step 1: Get caption tracks
+            // Use generic UA
             const res = await fetchWithNoCache(`${instance}/api/v1/captions/${videoId}`, {
                 signal: AbortSignal.timeout(8000),
+                headers: { "User-Agent": "" }
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -362,6 +377,7 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
             const contentUrl = `${instance}${track.url}`;
             const subRes = await fetchWithNoCache(contentUrl, {
                 signal: AbortSignal.timeout(8000),
+                headers: { "User-Agent": "" }
             });
             if (!subRes.ok) throw new Error("Failed to fetch caption content");
 
@@ -391,6 +407,33 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
         const errMsgs = errors.map((e: any) => e.message).join(" | ");
         console.warn(`[Transcript] Invidious all failed: ${errMsgs}`);
         throw new Error(`Invidious failed: ${errMsgs}`);
+    }
+}
+
+/**
+ * Method 5: Legacy Google Video API (The "Hail Mary")
+ * Accesses safe/old timedtext endpoint.
+ */
+async function fetchViaLegacyApi(videoId: string): Promise<string> {
+    console.log(`[Transcript] Trying Legacy API...`);
+    try {
+        const res = await fetchWithNoCache(`http://video.google.com/timedtext?lang=en&v=${videoId}`, {
+            headers: { "User-Agent": "Mozilla/5.0" }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const xml = await res.text();
+        if (!xml || xml.length < 20 || !xml.includes("<transcript>")) {
+            throw new Error("Invalid XML response");
+        }
+
+        const text = parseCaptionXml(xml);
+        if (!text || text.length < 10) throw new Error("Parse failed");
+
+        console.log(`[Transcript] ✓ Legacy API: ${text.length} chars`);
+        return text;
+    } catch (e: any) {
+        throw new Error(`Legacy API failed: ${e.message}`);
     }
 }
 
@@ -433,6 +476,14 @@ async function fetchTranscript(videoId: string): Promise<string> {
     } catch (e: any) {
         debugLogs.push(`WatchPage: ${e.message}`);
         console.warn(`[Transcript] Watch page method failed: ${e.message}`);
+    }
+
+    // Method 5: Legacy API
+    try {
+        return await fetchViaLegacyApi(videoId);
+    } catch (e: any) {
+        debugLogs.push(`LegacyAPI: ${e.message}`);
+        console.warn(`[Transcript] Legacy method failed: ${e.message}`);
     }
 
     // Capture logs in server console for admins
