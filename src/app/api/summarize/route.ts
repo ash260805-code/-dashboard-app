@@ -237,6 +237,71 @@ async function fetchViaWatchPage(videoId: string): Promise<string> {
 }
 
 /**
+ * Method 3: Invidious API (Public Instances)
+ * Proxies requests through community-hosted instances to bypass IP blocks.
+ */
+async function fetchViaInvidious(videoId: string): Promise<string> {
+    const instances = [
+        "https://inv.tux.pizza",
+        "https://invidious.flokinet.to",
+        "https://invidious.projectsegfau.lt",
+        "https://vid.puffyan.us",
+        "https://yewtu.be",
+        "https://yt.artemislena.eu",
+    ];
+
+    console.log(`[Transcript] Trying Invidious fallback (${instances.length} instances)...`);
+    const errors: string[] = [];
+
+    for (const instance of instances) {
+        try {
+            // Step 1: Get caption tracks
+            const res = await fetch(`${instance}/api/v1/captions/${videoId}`, {
+                signal: AbortSignal.timeout(5000), // 5s timeout per instance
+            });
+
+            if (!res.ok) continue;
+
+            const tracks = await res.json();
+            if (!Array.isArray(tracks) || tracks.length === 0) continue;
+
+            // Step 2: Find English track
+            const enTrack = tracks.find((t: any) => t.languageCode === "en" || t.languageCode?.startsWith("en"));
+            const track = enTrack || tracks[0];
+
+            // Step 3: Fetch content
+            const contentUrl = `${instance}${track.url}`;
+            const subRes = await fetch(contentUrl, {
+                signal: AbortSignal.timeout(5000),
+            });
+
+            if (!subRes.ok) continue;
+
+            const text = await subRes.text();
+            if (!text || text.length < 50) continue;
+
+            // Invidious usually returns VTT or raw text. 
+            // If it's VTT, we might need to clean it, but our prompt handles raw text well enough.
+            // Let's do basic cleanup just in case.
+            const cleanText = text
+                .replace(/WEBVTT/g, "")
+                .replace(/\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}/g, "")
+                .replace(/<[^>]*>/g, "")
+                .replace(/\n+/g, " ")
+                .trim();
+
+            console.log(`[Transcript] ✓ Invidious (${instance}): ${cleanText.length} chars`);
+            return cleanText;
+
+        } catch (e: any) {
+            errors.push(`${instance}: ${e.message}`);
+        }
+    }
+
+    throw new Error(`Invidious failed: ${errors.length} instances tried`);
+}
+
+/**
  * Master transcript fetcher: tries multiple methods in sequence.
  */
 async function fetchTranscript(videoId: string): Promise<string> {
@@ -254,9 +319,16 @@ async function fetchTranscript(videoId: string): Promise<string> {
         console.warn(`[Transcript] Watch page method failed: ${e.message}`);
     }
 
+    // Method 3: Invidious API (Final fallback for strict IP blocks)
+    try {
+        return await fetchViaInvidious(videoId);
+    } catch (e: any) {
+        console.warn(`[Transcript] Invidious method failed: ${e.message}`);
+    }
+
     // All methods failed
     throw new Error(
-        "Could not fetch transcript for this video. The video may not have captions, or YouTube is temporarily blocking requests. Please try again in a moment or use a different video."
+        "Could not fetch transcript. The video may not have captions, or YouTube is blocking our servers. Please try again later."
     );
 }
 
