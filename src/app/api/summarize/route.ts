@@ -3,13 +3,18 @@ import { auth } from "@/lib/auth";
 
 // robust fetch helper with no caching and browser headers
 async function fetchWithNoCache(url: string, options: RequestInit = {}): Promise<Response> {
-    const headers = {
+    const headers: Record<string, string> = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",
         "Expires": "0",
-        ...options.headers,
+        ...(options.headers as Record<string, string>),
     };
+
+    // Inject User Cookies if provided
+    if (process.env.YOUTUBE_COOKIES) {
+        headers["Cookie"] = process.env.YOUTUBE_COOKIES;
+    }
 
     return fetch(url, {
         ...options,
@@ -191,7 +196,6 @@ async function fetchViaWatchPage(videoId: string): Promise<string> {
         headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept-Language": "en-US,en;q=0.9",
-            "Cookie": "CONSENT=YES+yt.453767867.en+FP+XXXXXXXXXX",
         },
     });
 
@@ -213,20 +217,28 @@ async function fetchViaWatchPage(videoId: string): Promise<string> {
     const enTrack = tracks.find((t: any) => t.languageCode === "en" || t.languageCode?.startsWith("en"));
     const track = enTrack || tracks[0];
 
-    // Fetch caption content with cookies from the page
-    const cookies: string[] = ["CONSENT=YES+yt.453767867.en+FP+XXXXXXXXXX"];
-    res.headers.forEach((value, key) => {
-        if (key.toLowerCase() === "set-cookie") {
-            cookies.push(value.split(";")[0]);
+    // Cookies handling: Combine fetched cookies with User Cookies
+    let cookiesStr = "CONSENT=YES+yt.453767867.en+FP+XXXXXXXXXX";
+    if (process.env.YOUTUBE_COOKIES) {
+        cookiesStr = process.env.YOUTUBE_COOKIES;
+    } else {
+        const fetchedCookies: string[] = [];
+        res.headers.forEach((value, key) => {
+            if (key.toLowerCase() === "set-cookie") {
+                fetchedCookies.push(value.split(";")[0]);
+            }
+        });
+        if (fetchedCookies.length > 0) {
+            cookiesStr += "; " + fetchedCookies.join("; ");
         }
-    });
+    }
 
     // Try fetching with mobile UA (important: the caption server responds differently per UA)
     const mobileUA = "com.google.android.youtube/19.09.37 (Linux; U; Android 12; US) gzip";
     const captRes = await fetchWithNoCache(track.baseUrl, {
         headers: {
             "User-Agent": mobileUA,
-            "Cookie": cookies.join("; "),
+            "Cookie": cookiesStr,
         },
     });
 
@@ -236,7 +248,7 @@ async function fetchViaWatchPage(videoId: string): Promise<string> {
         const captRes2 = await fetchWithNoCache(track.baseUrl, {
             headers: {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Cookie": cookies.join("; "),
+                "Cookie": cookiesStr,
                 "Referer": `https://www.youtube.com/watch?v=${videoId}`,
             },
         });
