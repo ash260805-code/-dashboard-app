@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 
+// robust fetch helper with no caching and browser headers
+async function fetchWithNoCache(url: string, options: RequestInit = {}): Promise<Response> {
+    const headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+        ...options.headers,
+    };
+
+    return fetch(url, {
+        ...options,
+        headers,
+        cache: "no-store", // Critical for Vercel/Next.js
+        next: { revalidate: 0 }, // For Next.js 13+
+    });
+}
+
 function extractVideoId(url: string): string | null {
     const patterns = [
         /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
@@ -113,7 +131,7 @@ async function fetchViaInnertube(videoId: string): Promise<string> {
     for (const client of clients) {
         try {
             console.log(`[Transcript] Trying ${client.name}...`);
-            const playerRes = await fetch(
+            const playerRes = await fetchWithNoCache(
                 "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
                 {
                     method: "POST",
@@ -142,7 +160,7 @@ async function fetchViaInnertube(videoId: string): Promise<string> {
             const enTrack = tracks.find((t: any) => t.languageCode === "en" || t.languageCode?.startsWith("en"));
             const track = enTrack || tracks[0];
 
-            const captRes = await fetch(track.baseUrl, {
+            const captRes = await fetchWithNoCache(track.baseUrl, {
                 headers: { "User-Agent": client.ua },
             });
             const xml = await captRes.text();
@@ -169,7 +187,7 @@ async function fetchViaInnertube(videoId: string): Promise<string> {
 async function fetchViaWatchPage(videoId: string): Promise<string> {
     console.log(`[Transcript] Trying watch page scrape...`);
 
-    const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+    const res = await fetchWithNoCache(`https://www.youtube.com/watch?v=${videoId}`, {
         headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept-Language": "en-US,en;q=0.9",
@@ -205,7 +223,7 @@ async function fetchViaWatchPage(videoId: string): Promise<string> {
 
     // Try fetching with mobile UA (important: the caption server responds differently per UA)
     const mobileUA = "com.google.android.youtube/19.09.37 (Linux; U; Android 12; US) gzip";
-    const captRes = await fetch(track.baseUrl, {
+    const captRes = await fetchWithNoCache(track.baseUrl, {
         headers: {
             "User-Agent": mobileUA,
             "Cookie": cookies.join("; "),
@@ -215,7 +233,7 @@ async function fetchViaWatchPage(videoId: string): Promise<string> {
     const xml = await captRes.text();
     if (!xml || xml.length === 0) {
         // Try with browser UA
-        const captRes2 = await fetch(track.baseUrl, {
+        const captRes2 = await fetchWithNoCache(track.baseUrl, {
             headers: {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "Cookie": cookies.join("; "),
@@ -260,7 +278,7 @@ async function fetchViaPiped(videoId: string): Promise<string> {
     // Helper to fetch from a single instance
     const fetchOne = async (instance: string): Promise<string> => {
         try {
-            const res = await fetch(`${instance}/streams/${videoId}`, {
+            const res = await fetchWithNoCache(`${instance}/streams/${videoId}`, {
                 signal: AbortSignal.timeout(8000),
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -272,7 +290,7 @@ async function fetchViaPiped(videoId: string): Promise<string> {
             const enTrack = subtitles.find((s: any) => s.code === "en" || s.code?.startsWith("en") || s.name?.toLowerCase().includes("english"));
             const track = enTrack || subtitles[0];
 
-            const subRes = await fetch(track.url, { signal: AbortSignal.timeout(8000) });
+            const subRes = await fetchWithNoCache(track.url, { signal: AbortSignal.timeout(8000) });
             if (!subRes.ok) throw new Error("Failed to fetch subtitle content");
 
             const text = await subRes.text();
@@ -329,7 +347,7 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
     const fetchOne = async (instance: string): Promise<string> => {
         try {
             // Step 1: Get caption tracks
-            const res = await fetch(`${instance}/api/v1/captions/${videoId}`, {
+            const res = await fetchWithNoCache(`${instance}/api/v1/captions/${videoId}`, {
                 signal: AbortSignal.timeout(8000),
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -343,7 +361,7 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
 
             // Step 3: Fetch content
             const contentUrl = `${instance}${track.url}`;
-            const subRes = await fetch(contentUrl, {
+            const subRes = await fetchWithNoCache(contentUrl, {
                 signal: AbortSignal.timeout(8000),
             });
             if (!subRes.ok) throw new Error("Failed to fetch caption content");
@@ -513,7 +531,7 @@ Make the notes clean, scannable, and useful for revision.
 TRANSCRIPT:
 ${truncated}`;
 
-            const aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            const aiRes = await fetchWithNoCache("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
