@@ -237,6 +237,69 @@ async function fetchViaWatchPage(videoId: string): Promise<string> {
 }
 
 /**
+ * Method 3: Piped API (Public Instances)
+ * Piped is another privacy-friendly YouTube frontend with a stable API.
+ */
+async function fetchViaPiped(videoId: string): Promise<string> {
+    const instances = [
+        "https://pipedapi.kavin.rocks",
+        "https://api.piped.privacy.com.de",
+        "https://piped-api.lunar.icu",
+        "https://pipedapi.drgns.space",
+        "https://api.piped.yt",
+    ];
+
+    console.log(`[Transcript] Trying Piped fallback (${instances.length} instances)...`);
+    const errors: string[] = [];
+
+    for (const instance of instances) {
+        try {
+            const res = await fetch(`${instance}/streams/${videoId}`, {
+                signal: AbortSignal.timeout(8000),
+            });
+
+            if (!res.ok) continue;
+
+            const data = await res.json();
+            const subtitles = data.subtitles;
+
+            if (!subtitles || !Array.isArray(subtitles) || subtitles.length === 0) continue;
+
+            // Find English track
+            const enTrack = subtitles.find((s: any) => s.code === "en" || s.code?.startsWith("en") || s.name?.toLowerCase().includes("english"));
+            const track = enTrack || subtitles[0];
+
+            // Fetch content
+            const subRes = await fetch(track.url, {
+                signal: AbortSignal.timeout(8000),
+            });
+
+            if (!subRes.ok) continue;
+
+            const text = await subRes.text();
+            if (!text || text.length < 50) continue;
+
+            // Piped returns VTT. Clean it.
+            const cleanText = text
+                .replace(/WEBVTT/g, "")
+                .replace(/^\d+\s+$/gm, "") // Remove sequence numbers
+                .replace(/\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}.*/g, "") // Remove timestamps
+                .replace(/<[^>]*>/g, "") // Remove HTML tags
+                .replace(/\n+/g, " ")
+                .trim();
+
+            console.log(`[Transcript] ✓ Piped (${instance}): ${cleanText.length} chars`);
+            return cleanText;
+
+        } catch (e: any) {
+            errors.push(`${instance}: ${e.message}`);
+        }
+    }
+
+    throw new Error(`Piped failed: ${errors.length} instances tried`);
+}
+
+/**
  * Method 3: Invidious API (Public Instances)
  * Proxies requests through community-hosted instances to bypass IP blocks.
  */
@@ -312,23 +375,30 @@ async function fetchTranscript(videoId: string): Promise<string> {
         console.warn(`[Transcript] Innertube methods failed: ${e.message}`);
     }
 
-    // Method 2: Watch page scraping (fallback for restricted environments)
+    // Method 2: Piped API (Very reliable fallback for restricted IPs)
     try {
-        return await fetchViaWatchPage(videoId);
+        return await fetchViaPiped(videoId);
     } catch (e: any) {
-        console.warn(`[Transcript] Watch page method failed: ${e.message}`);
+        console.warn(`[Transcript] Piped method failed: ${e.message}`);
     }
 
-    // Method 3: Invidious API (Final fallback for strict IP blocks)
+    // Method 3: Invidious API (Public Instances)
     try {
         return await fetchViaInvidious(videoId);
     } catch (e: any) {
         console.warn(`[Transcript] Invidious method failed: ${e.message}`);
     }
 
+    // Method 4: Watch page scraping (Last resort)
+    try {
+        return await fetchViaWatchPage(videoId);
+    } catch (e: any) {
+        console.warn(`[Transcript] Watch page method failed: ${e.message}`);
+    }
+
     // All methods failed
     throw new Error(
-        "Could not fetch transcript. The video may not have captions, or YouTube is blocking our servers. Please try again later."
+        "Could not fetch transcript. The video may not have captions, or YouTube is blocking servers. Please try again later."
     );
 }
 
