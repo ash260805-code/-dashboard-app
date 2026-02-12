@@ -46,11 +46,9 @@ function parseCaptionXml(xml: string): string {
 }
 
 /**
- * Fetch transcript using the Innertube player API with multiple client types.
- * The ANDROID client with a mobile User-Agent is the most reliable approach
- * for fetching captions from any environment (local, Vercel, etc.).
+ * Method 1: Innertube player API with multiple mobile clients.
  */
-async function fetchTranscript(videoId: string): Promise<string> {
+async function fetchViaInnertube(videoId: string): Promise<string> {
     const clients = [
         {
             name: "ANDROID",
@@ -64,6 +62,26 @@ async function fetchTranscript(videoId: string): Promise<string> {
                         androidSdkVersion: 31,
                         hl: "en",
                         gl: "US",
+                    },
+                },
+                contentCheckOk: true,
+                racyCheckOk: true,
+            },
+        },
+        {
+            name: "TV_EMBEDDED",
+            ua: "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version",
+            body: {
+                videoId,
+                context: {
+                    client: {
+                        clientName: "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+                        clientVersion: "2.0",
+                        hl: "en",
+                        gl: "US",
+                    },
+                    thirdParty: {
+                        embedUrl: "https://www.google.com",
                     },
                 },
                 contentCheckOk: true,
@@ -94,9 +112,7 @@ async function fetchTranscript(videoId: string): Promise<string> {
 
     for (const client of clients) {
         try {
-            console.log(`[Summarize] Trying ${client.name} client...`);
-
-            // Step 1: Get player data
+            console.log(`[Transcript] Trying ${client.name}...`);
             const playerRes = await fetch(
                 "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
                 {
@@ -109,68 +125,138 @@ async function fetchTranscript(videoId: string): Promise<string> {
                 }
             );
 
-            if (!playerRes.ok) {
-                throw new Error(`Player API returned ${playerRes.status}`);
-            }
+            if (!playerRes.ok) throw new Error(`HTTP ${playerRes.status}`);
 
-            const playerData = await playerRes.json();
-            const status = playerData?.playabilityStatus?.status;
-
+            const data = await playerRes.json();
+            const status = data?.playabilityStatus?.status;
             if (status !== "OK") {
-                const reason = playerData?.playabilityStatus?.reason || "Not playable";
-                throw new Error(`Video not playable: ${reason}`);
+                throw new Error(`${status}: ${data?.playabilityStatus?.reason || "blocked"}`);
             }
 
-            // Step 2: Get caption tracks
-            const tracks = playerData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+            const tracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+            if (!tracks?.length) throw new Error("No caption tracks");
 
-            if (!tracks || tracks.length === 0) {
-                throw new Error("No captions available");
-            }
+            console.log(`[Transcript] ${client.name}: ${tracks.length} tracks found`);
 
-            console.log(`[Summarize] Found ${tracks.length} caption tracks`);
+            // Prefer English
+            const enTrack = tracks.find((t: any) => t.languageCode === "en" || t.languageCode?.startsWith("en"));
+            const track = enTrack || tracks[0];
 
-            // Prefer English, then first available
-            const englishTrack = tracks.find(
-                (t: any) => t.languageCode === "en" || t.languageCode?.startsWith("en")
-            );
-            const selectedTrack = englishTrack || tracks[0];
-
-            // Step 3: Fetch caption content with the SAME mobile User-Agent
-            const captionRes = await fetch(selectedTrack.baseUrl, {
+            const captRes = await fetch(track.baseUrl, {
                 headers: { "User-Agent": client.ua },
             });
+            const xml = await captRes.text();
+            if (!xml || xml.length === 0) throw new Error("Empty caption response");
 
-            if (!captionRes.ok) {
-                throw new Error(`Caption fetch returned ${captionRes.status}`);
-            }
+            const text = parseCaptionXml(xml);
+            if (!text || text.length < 10) throw new Error("Failed to parse captions");
 
-            const xml = await captionRes.text();
-
-            if (!xml || xml.length === 0) {
-                throw new Error("Caption response was empty");
-            }
-
-            // Step 4: Parse the XML
-            const transcript = parseCaptionXml(xml);
-
-            if (!transcript || transcript.length < 10) {
-                throw new Error("Could not parse caption content");
-            }
-
-            console.log(`[Summarize] ✓ Got ${transcript.length} chars via ${client.name}`);
-            return transcript;
-        } catch (err: any) {
-            const msg = `${client.name}: ${err.message}`;
-            console.warn(`[Summarize] ✗ ${msg}`);
-            errors.push(msg);
+            console.log(`[Transcript] ✓ ${client.name}: ${text.length} chars`);
+            return text;
+        } catch (e: any) {
+            console.warn(`[Transcript] ✗ ${client.name}: ${e.message}`);
+            errors.push(`${client.name}: ${e.message}`);
         }
     }
 
-    // All clients failed
-    console.error(`[Summarize] All clients failed: ${errors.join(" | ")}`);
+    throw new Error(`Innertube failed: ${errors.join(" | ")}`);
+}
+
+/**
+ * Method 2: Watch page scraping + caption URL fetch.
+ * Falls back to extracting captions from the watch page's player response.
+ */
+async function fetchViaWatchPage(videoId: string): Promise<string> {
+    console.log(`[Transcript] Trying watch page scrape...`);
+
+    const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+        headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cookie": "CONSENT=YES+yt.453767867.en+FP+XXXXXXXXXX",
+        },
+    });
+
+    const html = await res.text();
+    if (html.length < 10000) throw new Error("Watch page too small");
+
+    // Extract player response
+    const playerMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});/);
+    if (!playerMatch) throw new Error("No player response in page");
+
+    const playerData = JSON.parse(playerMatch[1]);
+    const tracks = playerData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+
+    if (!tracks?.length) throw new Error("No captions in watch page");
+
+    console.log(`[Transcript] Watch page: ${tracks.length} tracks`);
+
+    // Prefer English
+    const enTrack = tracks.find((t: any) => t.languageCode === "en" || t.languageCode?.startsWith("en"));
+    const track = enTrack || tracks[0];
+
+    // Fetch caption content with cookies from the page
+    const cookies: string[] = ["CONSENT=YES+yt.453767867.en+FP+XXXXXXXXXX"];
+    res.headers.forEach((value, key) => {
+        if (key.toLowerCase() === "set-cookie") {
+            cookies.push(value.split(";")[0]);
+        }
+    });
+
+    // Try fetching with mobile UA (important: the caption server responds differently per UA)
+    const mobileUA = "com.google.android.youtube/19.09.37 (Linux; U; Android 12; US) gzip";
+    const captRes = await fetch(track.baseUrl, {
+        headers: {
+            "User-Agent": mobileUA,
+            "Cookie": cookies.join("; "),
+        },
+    });
+
+    const xml = await captRes.text();
+    if (!xml || xml.length === 0) {
+        // Try with browser UA
+        const captRes2 = await fetch(track.baseUrl, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Cookie": cookies.join("; "),
+                "Referer": `https://www.youtube.com/watch?v=${videoId}`,
+            },
+        });
+        const xml2 = await captRes2.text();
+        if (!xml2 || xml2.length === 0) throw new Error("Caption content empty");
+        const text = parseCaptionXml(xml2);
+        if (!text || text.length < 10) throw new Error("Parse failed");
+        return text;
+    }
+
+    const text = parseCaptionXml(xml);
+    if (!text || text.length < 10) throw new Error("Parse failed");
+
+    console.log(`[Transcript] ✓ Watch page: ${text.length} chars`);
+    return text;
+}
+
+/**
+ * Master transcript fetcher: tries multiple methods in sequence.
+ */
+async function fetchTranscript(videoId: string): Promise<string> {
+    // Method 1: Innertube API (most reliable from most environments)
+    try {
+        return await fetchViaInnertube(videoId);
+    } catch (e: any) {
+        console.warn(`[Transcript] Innertube methods failed: ${e.message}`);
+    }
+
+    // Method 2: Watch page scraping (fallback for restricted environments)
+    try {
+        return await fetchViaWatchPage(videoId);
+    } catch (e: any) {
+        console.warn(`[Transcript] Watch page method failed: ${e.message}`);
+    }
+
+    // All methods failed
     throw new Error(
-        "This video does not have captions available or it's restricted. Please try a different YouTube link that has captions/subtitles."
+        "Could not fetch transcript for this video. The video may not have captions, or YouTube is temporarily blocking requests. Please try again in a moment or use a different video."
     );
 }
 
@@ -263,7 +349,7 @@ ${truncated}`;
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                    "HTTP-Referer": "http://localhost:3000",
+                    "HTTP-Referer": request.headers.get("referer") || "https://dashboard-app.vercel.app",
                 },
                 body: JSON.stringify({
                     model: "google/gemini-2.0-flash-001",

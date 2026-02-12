@@ -1,25 +1,15 @@
 /**
- * Test ANDROID Innertube player with consent cookie
- * This should return caption URLs with proper IP
+ * Test the ANDROID client for the specific video from user's screenshot
  */
+async function testVideo(videoId: string) {
+    console.log(`\n=== Testing: ${videoId} ===\n`);
 
-async function fetchWithAndroid(videoId: string) {
-    console.log(`\n=== ANDROID Innertube for: ${videoId} ===\n`);
-
-    // Pre-set consent cookie
-    const consentCookie = "CONSENT=YES+yt.453767867.en+FP+XXXXXXXXXX";
-
-    const playerRes = await fetch(
-        "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+    const clients = [
         {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "User-Agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 12; US) gzip",
-                "Cookie": consentCookie,
-            },
-            body: JSON.stringify({
-                videoId: videoId,
+            name: "ANDROID",
+            ua: "com.google.android.youtube/19.09.37 (Linux; U; Android 12; US) gzip",
+            body: {
+                videoId,
                 context: {
                     client: {
                         clientName: "ANDROID",
@@ -31,60 +21,94 @@ async function fetchWithAndroid(videoId: string) {
                 },
                 contentCheckOk: true,
                 racyCheckOk: true,
-            }),
-        }
-    );
-
-    console.log(`Player Status: ${playerRes.status}`);
-    const playerData = await playerRes.json();
-    console.log(`Playability: ${playerData?.playabilityStatus?.status}`);
-
-    if (playerData?.playabilityStatus?.status !== "OK") {
-        console.log(`Reason: ${playerData?.playabilityStatus?.reason}`);
-    }
-
-    const tracks = playerData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-    if (!tracks?.length) {
-        console.log("No caption tracks");
-        return;
-    }
-
-    console.log(`Caption tracks: ${tracks.length}`);
-
-    for (const track of tracks) {
-        console.log(`\n--- Track: ${track.languageCode} (${track.name?.simpleText || 'unnamed'}) ---`);
-        const url = track.baseUrl;
-        console.log(`URL: ${url.substring(0, 120)}...`);
-
-        // Check if URL has proper IP
-        const ipMatch = url.match(/ip=([^&]+)/);
-        console.log(`IP in URL: ${ipMatch ? ipMatch[1] : 'not found'}`);
-
-        // Try fetching
-        const captRes = await fetch(url, {
-            headers: {
-                "User-Agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 12; US) gzip",
-                "Cookie": consentCookie,
             },
-        });
-        const xml = await captRes.text();
-        console.log(`Response: ${captRes.status}, Length: ${xml.length}`);
-        if (xml.length > 0) {
-            console.log(`Preview: ${xml.substring(0, 300)}`);
+        },
+        {
+            name: "IOS",
+            ua: "com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 17_0 like Mac OS X; en_US)",
+            body: {
+                videoId,
+                context: {
+                    client: {
+                        clientName: "IOS",
+                        clientVersion: "19.09.3",
+                        deviceModel: "iPhone14,3",
+                        hl: "en",
+                        gl: "US",
+                    },
+                },
+                contentCheckOk: true,
+                racyCheckOk: true,
+            },
+        },
+        {
+            name: "WEB",
+            ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            body: {
+                videoId,
+                context: {
+                    client: {
+                        clientName: "WEB",
+                        clientVersion: "2.20240313.05.00",
+                        hl: "en",
+                        gl: "US",
+                    },
+                },
+            },
+        },
+    ];
 
-            // Try parsing
-            const regex = /<(?:text|p|s)[^>]*>([\s\S]*?)<\/(?:text|p|s)>/g;
-            let count = 0;
-            let match;
-            while ((match = regex.exec(xml)) !== null) count++;
-            console.log(`Parsed segments: ${count}`);
+    for (const client of clients) {
+        try {
+            console.log(`--- ${client.name} ---`);
+            const playerRes = await fetch(
+                "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "User-Agent": client.ua,
+                    },
+                    body: JSON.stringify(client.body),
+                }
+            );
+            const data = await playerRes.json();
+            console.log(`Playability: ${data?.playabilityStatus?.status}`);
+            if (data?.playabilityStatus?.status !== "OK") {
+                console.log(`Reason: ${data?.playabilityStatus?.reason || "unknown"}`);
+            }
+
+            const tracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+            if (tracks?.length) {
+                console.log(`Caption tracks: ${tracks.length}`);
+                for (const t of tracks) {
+                    console.log(`  - ${t.languageCode} (${t.name?.simpleText || t.kind || "unnamed"})`);
+                }
+                // Try fetching captions
+                const track = tracks[0];
+                const captRes = await fetch(track.baseUrl, {
+                    headers: { "User-Agent": client.ua },
+                });
+                const xml = await captRes.text();
+                console.log(`Caption content: ${xml.length} chars`);
+                if (xml.length > 0) {
+                    // Parse
+                    const regex = /<(?:text|p|s)[^>]*>([\s\S]*?)<\/(?:text|p|s)>/g;
+                    let count = 0;
+                    let match;
+                    while ((match = regex.exec(xml)) !== null) count++;
+                    console.log(`Parsed segments: ${count}`);
+                    if (count > 0) {
+                        console.log(`✅ SUCCESS with ${client.name}!`);
+                    }
+                }
+            } else {
+                console.log(`No caption tracks`);
+            }
+        } catch (e: any) {
+            console.error(`Error: ${e.message}`);
         }
     }
 }
 
-async function main() {
-    await fetchWithAndroid("dQw4w9WgXcQ");
-    await fetchWithAndroid("qzq_-plz0bQ");
-}
-
-main();
+testVideo("-MTRxRO5SRA");
