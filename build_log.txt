@@ -43,7 +43,7 @@ eption
   Generating static pages using 15 workers (3/13) 
   Generating static pages using 15 workers (6/13) 
   Generating static pages using 15 workers (9/13) 
-Γ£ô Generating static pages using 15 workers (13/13) in 430.7ms
+Γ£ô Generating static pages using 15 workers (13/13) in 443.6ms
   Finalizing page optimization ...
 
 Route (app)
