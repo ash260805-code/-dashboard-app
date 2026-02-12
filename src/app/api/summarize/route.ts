@@ -249,58 +249,57 @@ async function fetchViaPiped(videoId: string): Promise<string> {
         "https://api.piped.yt",
     ];
 
-    console.log(`[Transcript] Trying Piped fallback (${instances.length} instances)...`);
-    const errors: string[] = [];
+    console.log(`[Transcript] Trying Piped fallback (${instances.length} instances parallel)...`);
 
-    for (const instance of instances) {
+    // Helper to fetch from a single instance
+    const fetchOne = async (instance: string): Promise<string> => {
         try {
             const res = await fetch(`${instance}/streams/${videoId}`, {
-                signal: AbortSignal.timeout(8000),
+                signal: AbortSignal.timeout(6000),
             });
-
-            if (!res.ok) continue;
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
             const data = await res.json();
             const subtitles = data.subtitles;
+            if (!subtitles || !Array.isArray(subtitles) || subtitles.length === 0) throw new Error("No subtitles");
 
-            if (!subtitles || !Array.isArray(subtitles) || subtitles.length === 0) continue;
-
-            // Find English track
             const enTrack = subtitles.find((s: any) => s.code === "en" || s.code?.startsWith("en") || s.name?.toLowerCase().includes("english"));
             const track = enTrack || subtitles[0];
 
-            // Fetch content
-            const subRes = await fetch(track.url, {
-                signal: AbortSignal.timeout(8000),
-            });
-
-            if (!subRes.ok) continue;
+            const subRes = await fetch(track.url, { signal: AbortSignal.timeout(6000) });
+            if (!subRes.ok) throw new Error("Failed to fetch subtitle content");
 
             const text = await subRes.text();
-            if (!text || text.length < 50) continue;
+            if (!text || text.length < 50) throw new Error("Empty subtitle content");
 
-            // Piped returns VTT. Clean it.
-            const cleanText = text
+            return text
                 .replace(/WEBVTT/g, "")
-                .replace(/^\d+\s+$/gm, "") // Remove sequence numbers
-                .replace(/\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}.*/g, "") // Remove timestamps
-                .replace(/<[^>]*>/g, "") // Remove HTML tags
+                .replace(/^\d+\s+$/gm, "")
+                .replace(/\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}.*/g, "")
+                .replace(/<[^>]*>/g, "")
                 .replace(/\n+/g, " ")
                 .trim();
-
-            console.log(`[Transcript] ✓ Piped (${instance}): ${cleanText.length} chars`);
-            return cleanText;
-
         } catch (e: any) {
-            errors.push(`${instance}: ${e.message}`);
+            throw new Error(`${instance}: ${e.message}`);
         }
-    }
+    };
 
-    throw new Error(`Piped failed: ${errors.length} instances tried`);
+    // Race them all!
+    try {
+        const result = await Promise.any(instances.map(fetchOne));
+        console.log(`[Transcript] ✓ Piped success`);
+        return result;
+    } catch (aggregateError: any) {
+        // Log all errors
+        const errors = (aggregateError as AggregateError).errors;
+        const errMsgs = errors.map((e: any) => e.message).join(" | ");
+        console.warn(`[Transcript] Piped all failed: ${errMsgs}`);
+        throw new Error(`Piped failed: ${errMsgs}`);
+    }
 }
 
 /**
- * Method 3: Invidious API (Public Instances)
+ * Method 4: Invidious API (Public Instances)
  * Proxies requests through community-hosted instances to bypass IP blocks.
  */
 async function fetchViaInvidious(videoId: string): Promise<string> {
@@ -313,20 +312,19 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
         "https://yt.artemislena.eu",
     ];
 
-    console.log(`[Transcript] Trying Invidious fallback (${instances.length} instances)...`);
-    const errors: string[] = [];
+    console.log(`[Transcript] Trying Invidious fallback (${instances.length} instances parallel)...`);
 
-    for (const instance of instances) {
+    // Helper to fetch from a single instance
+    const fetchOne = async (instance: string): Promise<string> => {
         try {
             // Step 1: Get caption tracks
             const res = await fetch(`${instance}/api/v1/captions/${videoId}`, {
-                signal: AbortSignal.timeout(5000), // 5s timeout per instance
+                signal: AbortSignal.timeout(6000),
             });
-
-            if (!res.ok) continue;
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
             const tracks = await res.json();
-            if (!Array.isArray(tracks) || tracks.length === 0) continue;
+            if (!Array.isArray(tracks) || tracks.length === 0) throw new Error("No caption tracks");
 
             // Step 2: Find English track
             const enTrack = tracks.find((t: any) => t.languageCode === "en" || t.languageCode?.startsWith("en"));
@@ -335,17 +333,13 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
             // Step 3: Fetch content
             const contentUrl = `${instance}${track.url}`;
             const subRes = await fetch(contentUrl, {
-                signal: AbortSignal.timeout(5000),
+                signal: AbortSignal.timeout(6000),
             });
-
-            if (!subRes.ok) continue;
+            if (!subRes.ok) throw new Error("Failed to fetch caption content");
 
             const text = await subRes.text();
-            if (!text || text.length < 50) continue;
+            if (!text || text.length < 50) throw new Error("Empty caption content");
 
-            // Invidious usually returns VTT or raw text. 
-            // If it's VTT, we might need to clean it, but our prompt handles raw text well enough.
-            // Let's do basic cleanup just in case.
             const cleanText = text
                 .replace(/WEBVTT/g, "")
                 .replace(/\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}/g, "")
@@ -353,52 +347,74 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
                 .replace(/\n+/g, " ")
                 .trim();
 
-            console.log(`[Transcript] ✓ Invidious (${instance}): ${cleanText.length} chars`);
             return cleanText;
-
         } catch (e: any) {
-            errors.push(`${instance}: ${e.message}`);
+            throw new Error(`${instance}: ${e.message}`);
         }
-    }
+    };
 
-    throw new Error(`Invidious failed: ${errors.length} instances tried`);
+    // Race them all!
+    try {
+        const result = await Promise.any(instances.map(fetchOne));
+        console.log(`[Transcript] ✓ Invidious success`);
+        return result;
+    } catch (aggregateError: any) {
+        const errors = (aggregateError as AggregateError).errors;
+        const errMsgs = errors.map((e: any) => e.message).join(" | ");
+        console.warn(`[Transcript] Invidious all failed: ${errMsgs}`);
+        throw new Error(`Invidious failed: ${errMsgs}`);
+    }
 }
 
 /**
  * Master transcript fetcher: tries multiple methods in sequence.
  */
 async function fetchTranscript(videoId: string): Promise<string> {
-    // Method 1: Innertube API (most reliable from most environments)
+    const debugLogs: string[] = [];
+
+    // Method 1: Innertube API
     try {
         return await fetchViaInnertube(videoId);
     } catch (e: any) {
-        console.warn(`[Transcript] Innertube methods failed: ${e.message}`);
+        // Clean up innerTube error messages
+        const msg = e.message.length > 100 ? e.message.substring(0, 100) + "..." : e.message;
+        debugLogs.push(`Innertube: ${msg}`);
+        console.warn(`[Transcript] Innertube methods failed: ${msg}`);
     }
 
-    // Method 2: Piped API (Very reliable fallback for restricted IPs)
+    // Method 2: Piped API (Parallel)
     try {
         return await fetchViaPiped(videoId);
     } catch (e: any) {
-        console.warn(`[Transcript] Piped method failed: ${e.message}`);
+        const msg = e.message.length > 100 ? e.message.substring(0, 100) + "..." : e.message;
+        debugLogs.push(`Piped: ${msg}`);
+        console.warn(`[Transcript] Piped method failed: ${msg}`);
     }
 
-    // Method 3: Invidious API (Public Instances)
+    // Method 3: Invidious API (Parallel)
     try {
         return await fetchViaInvidious(videoId);
     } catch (e: any) {
-        console.warn(`[Transcript] Invidious method failed: ${e.message}`);
+        const msg = e.message.length > 100 ? e.message.substring(0, 100) + "..." : e.message;
+        debugLogs.push(`Invidious: ${msg}`);
+        console.warn(`[Transcript] Invidious method failed: ${msg}`);
     }
 
-    // Method 4: Watch page scraping (Last resort)
+    // Method 4: Watch page scraping
     try {
         return await fetchViaWatchPage(videoId);
     } catch (e: any) {
+        debugLogs.push(`WatchPage: ${e.message}`);
         console.warn(`[Transcript] Watch page method failed: ${e.message}`);
     }
 
-    // All methods failed
+    // Capture logs in server console for admins
+    console.error("Transcript Fetch Failure Logs:", JSON.stringify(debugLogs, null, 2));
+
+    // Throw a detailed error for the user to share
+    const logStr = debugLogs.join(" | ").substring(0, 300); // Truncate for UI
     throw new Error(
-        "Could not fetch transcript. The video may not have captions, or YouTube is blocking servers. Please try again later."
+        `Failed to fetch transcript. Debug: [${logStr}...]`
     );
 }
 
@@ -443,6 +459,7 @@ export async function POST(request: NextRequest) {
             transcriptText = await fetchTranscript(videoId);
         } catch (err: any) {
             console.error("[Summarize] Transcript error:", err.message);
+            // Return 422 with the exact error message (containing debug logs)
             return NextResponse.json(
                 { error: err.message },
                 { status: 422 }

@@ -16,22 +16,22 @@ Files\nodejs/node.exe" "C:\Program
 Files\nodejs/node_mo ...
 + ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpe 
-   cified: (ΓÜá The "middle...lewar  
-  e-to-proxy:String) [], RemoteExc   
- eption
-    + FullyQualifiedErrorId : Native 
-   CommandError
+    + CategoryInfo          : 
+NotSpeci    fied: (ΓÜá The 
+"middle...leware-to    
+-proxy:String) [], RemoteException
+    + FullyQualifiedErrorId : 
+NativeCo    mmandError
  
   Creating an optimized production build ...
-Γ£ô Compiled successfully in 3.6s
+Γ£ô Compiled successfully in 3.5s
   Running TypeScript ...
   Collecting page data using 15 workers ...
   Generating static pages using 15 workers (0/13) ...
   Generating static pages using 15 workers (3/13) 
   Generating static pages using 15 workers (6/13) 
   Generating static pages using 15 workers (9/13) 
-Γ£ô Generating static pages using 15 workers (13/13) in 828.0ms
+Γ£ô Generating static pages using 15 workers (13/13) in 674.7ms
   Finalizing page optimization ...
 
 Route (app)
