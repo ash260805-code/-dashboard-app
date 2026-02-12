@@ -1,0 +1,56 @@
+﻿
+> dashboard-app@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local, .env
+
+node.exe : ΓÜá The "middleware" file 
+convention is deprecated. Please use 
+"proxy" instead. Learn more: https://
+nextjs.org/docs/messages/middleware-t
+o-proxy
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpe 
+   cified: (ΓÜá The "middle...lewar  
+  e-to-proxy:String) [], RemoteExc   
+ eption
+    + FullyQualifiedErrorId : Native 
+   CommandError
+ 
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 3.6s
+  Running TypeScript ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/13) ...
+  Generating static pages using 15 workers (3/13) 
+  Generating static pages using 15 workers (6/13) 
+  Generating static pages using 15 workers (9/13) 
+Γ£ô Generating static pages using 15 workers (13/13) in 563.6ms
+  Finalizing page optimization ...
+
+Route (app)
+Γöî Γùï /
+Γö£ Γùï /_not-found
+Γö£ Γùï /admin
+Γö£ ╞Æ /api/admin/users
+Γö£ ╞Æ /api/auth/[...nextauth]
+Γö£ ╞Æ /api/register
+Γö£ ╞Æ /api/summarize
+Γö£ ╞Æ /dashboard
+Γö£ Γùï /dashboard/ai-tools
+Γö£ Γùï /login
+Γö£ ╞Æ /pending
+Γöö Γùï /signup
+
+
+╞Æ Proxy (Middleware)
+
+Γùï  (Static)   prerendered as static content
+╞Æ  (Dynamic)  server-rendered on demand
+
