@@ -13,6 +13,11 @@ async function fetchWithNoCache(url: string, options: RequestInit = {}): Promise
     const inputHeaders = (options.headers as Record<string, string>) || {};
     const finalHeaders = { ...defaultHeaders, ...inputHeaders };
 
+    // Inject cookies if available and not already present
+    if (process.env.YOUTUBE_COOKIES && !finalHeaders["Cookie"]) {
+        finalHeaders["Cookie"] = process.env.YOUTUBE_COOKIES;
+    }
+
     return fetch(url, {
         ...options,
         headers: finalHeaders,
