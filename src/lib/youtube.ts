@@ -1,4 +1,6 @@
 
+import { YoutubeTranscript } from "youtube-transcript";
+
 // Robust fetch helper with no caching and browser headers
 async function fetchWithNoCache(url: string, options: RequestInit = {}): Promise<Response> {
     const defaultHeaders: Record<string, string> = {
@@ -61,6 +63,29 @@ function parseCaptionXml(xml: string): string {
     }
 
     return textSegments.join(" ");
+}
+
+/**
+ * Method 0: youtube-transcript library
+ * Uses internal API endpoint often less restricted than public ones.
+ */
+async function fetchViaLibrary(videoId: string): Promise<string> {
+    console.log(`[Transcript] Trying youtube-transcript library...`);
+    try {
+        const transcript = await YoutubeTranscript.fetchTranscript(videoId, {
+            lang: "en",
+        });
+
+        if (!transcript || transcript.length === 0) {
+            throw new Error("Empty transcript returned");
+        }
+
+        const text = transcript.map((item) => item.text).join(" ");
+        console.log(`[Transcript] ✓ Library success: ${text.length} chars`);
+        return text;
+    } catch (e: any) {
+        throw new Error(`Library failed: ${e.message}`);
+    }
 }
 
 /**
@@ -270,6 +295,11 @@ async function fetchViaPiped(videoId: string): Promise<string> {
         "https://api.piped.projectsegfau.lt",
         "https://pipedapi.system41.xyz",
         "https://api.piped.zing.studio",
+        "https://piped.video",
+        "https://piped.tokhmi.xyz",
+        "https://piped.moomoo.me",
+        "https://piped.syncpundit.io",
+        "https://piped.mha.fi",
     ];
 
     console.log(`[Transcript] Trying Piped fallback (${instances.length} instances parallel)...`);
@@ -344,6 +374,9 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
         "https://invidious.lunar.icu",
         "https://inv.nadeko.net",
         "https://invidious.protokolla.fi",
+        "https://invidious.drgns.space",
+        "https://invidious.jing.rocks",
+        "https://invidious.nerdvpn.de",
     ];
 
     console.log(`[Transcript] Trying Invidious fallback (${instances.length} instances parallel)...`);
@@ -435,6 +468,14 @@ async function fetchViaLegacyApi(videoId: string): Promise<string> {
  */
 export async function fetchTranscript(videoId: string): Promise<string> {
     const debugLogs: string[] = [];
+
+    // Method 0: Library (New Primary)
+    try {
+        return await fetchViaLibrary(videoId);
+    } catch (e: any) {
+        debugLogs.push(`Library: ${e.message}`);
+        console.warn(`[Transcript] Library method failed: ${e.message}`);
+    }
 
     // Method 1: Innertube API
     try {
