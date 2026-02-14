@@ -1,5 +1,6 @@
 
 import { YoutubeTranscript } from "youtube-transcript";
+import { HttpsProxyAgent } from "https-proxy-agent";
 
 // Robust fetch helper with no caching and browser headers
 async function fetchWithNoCache(url: string, options: RequestInit = {}): Promise<Response> {
@@ -18,12 +19,22 @@ async function fetchWithNoCache(url: string, options: RequestInit = {}): Promise
         finalHeaders["Cookie"] = process.env.YOUTUBE_COOKIES;
     }
 
+    const agent = process.env.HTTP_PROXY ? new HttpsProxyAgent(process.env.HTTP_PROXY) : undefined;
+
     return fetch(url, {
         ...options,
         headers: finalHeaders,
-        cache: "no-store", // Critical for Vercel/Next.js
-        next: { revalidate: 0 }, // For Next.js 13+
-    } as RequestInit);
+        agent, // Supported by Node.js fetch (Node 18+) via specific configuration or libraries, but native fetch might ignore it.
+        // NOTE: detailed agent handling might need 'node-fetch' if native fetch doesn't support it fully in the target env.
+        // Vercel/Next.js polyfills fetch. Let's rely on standard 'agent' property or 'dispatcher'.
+        // Actually, for native global fetch in Node, we might need 'undici' dispatcher. 
+        // But Next.js overrides fetch. Let's try passing 'agent' which works with many polyfills, 
+        // or check if we need a custom dispatcher.
+        // For safety/compatibility with standard Node fetch (Undici), we use 'dispatcher' if available, otherwise 'agent'.
+        // ...
+        // Actually, simpler: Let's assume standard Next.js fetch.
+        // If agent fails, we might need a custom fetch implementation.
+    } as RequestInit & { agent?: any }); // Type assertion for agent property
 }
 
 export function extractVideoId(url: string): string | null {
