@@ -24,17 +24,8 @@ async function fetchWithNoCache(url: string, options: RequestInit = {}): Promise
     return fetch(url, {
         ...options,
         headers: finalHeaders,
-        agent, // Supported by Node.js fetch (Node 18+) via specific configuration or libraries, but native fetch might ignore it.
-        // NOTE: detailed agent handling might need 'node-fetch' if native fetch doesn't support it fully in the target env.
-        // Vercel/Next.js polyfills fetch. Let's rely on standard 'agent' property or 'dispatcher'.
-        // Actually, for native global fetch in Node, we might need 'undici' dispatcher. 
-        // But Next.js overrides fetch. Let's try passing 'agent' which works with many polyfills, 
-        // or check if we need a custom dispatcher.
-        // For safety/compatibility with standard Node fetch (Undici), we use 'dispatcher' if available, otherwise 'agent'.
-        // ...
-        // Actually, simpler: Let's assume standard Next.js fetch.
-        // If agent fails, we might need a custom fetch implementation.
-    } as RequestInit & { agent?: any }); // Type assertion for agent property
+        agent, // Supported by Node.js fetch (Node 18+) via specific configuration or libraries
+    } as RequestInit & { agent?: any });
 }
 
 export function extractVideoId(url: string): string | null {
@@ -54,7 +45,6 @@ export function extractVideoId(url: string): string | null {
 
 /**
  * Parse caption XML into plain text.
- * Handles <text>, <p>, and <s> tags, and strips nested HTML.
  */
 function parseCaptionXml(xml: string): string {
     const textSegments: string[] = [];
@@ -83,7 +73,6 @@ function parseCaptionXml(xml: string): string {
 
 /**
  * Method 0: youtube-transcript library
- * Uses internal API endpoint often less restricted than public ones.
  */
 async function fetchViaLibrary(videoId: string): Promise<string> {
     console.log(`[Transcript] Trying youtube-transcript library...`);
@@ -105,10 +94,32 @@ async function fetchViaLibrary(videoId: string): Promise<string> {
 }
 
 /**
- * Method 1: Innertube player API with multiple mobile clients.
+ * Method 1: Innertube player API with WEB client (Best for Cookies) and Mobile fallbacks
  */
 async function fetchViaInnertube(videoId: string): Promise<string> {
     const clients = [
+        {
+            name: "WEB_COOKIES", // New: Tries to simulate normal browser playback
+            ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            body: {
+                videoId,
+                context: {
+                    client: {
+                        clientName: "WEB",
+                        clientVersion: "2.20240217.09.00", // Recent web version
+                        hl: "en",
+                        gl: "US",
+                    },
+                },
+                playbackContext: {
+                    contentPlaybackContext: {
+                        html5Preference: "HTML5_PREF_WANTS",
+                    },
+                },
+                contentCheckOk: true,
+                racyCheckOk: true,
+            },
+        },
         {
             name: "ANDROID",
             ua: "com.google.android.youtube/19.09.37 (Linux; U; Android 12; US) gzip",
@@ -147,24 +158,6 @@ async function fetchViaInnertube(videoId: string): Promise<string> {
                 racyCheckOk: true,
             },
         },
-        {
-            name: "IOS",
-            ua: "com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 17_0 like Mac OS X; en_US)",
-            body: {
-                videoId,
-                context: {
-                    client: {
-                        clientName: "IOS",
-                        clientVersion: "19.09.3",
-                        deviceModel: "iPhone14,3",
-                        hl: "en",
-                        gl: "US",
-                    },
-                },
-                contentCheckOk: true,
-                racyCheckOk: true,
-            },
-        },
     ];
 
     const errors: string[] = [];
@@ -179,6 +172,7 @@ async function fetchViaInnertube(videoId: string): Promise<string> {
                     headers: {
                         "Content-Type": "application/json",
                         "User-Agent": client.ua,
+                        // Cookies are auto-injected by fetchWithNoCache
                     },
                     body: JSON.stringify(client.body),
                 }
@@ -222,8 +216,7 @@ async function fetchViaInnertube(videoId: string): Promise<string> {
 }
 
 /**
- * Method 2: Watch page scraping + caption URL fetch.
- * Falls back to extracting captions from the watch page's player response.
+ * Method 2: Watch page scraping
  */
 async function fetchViaWatchPage(videoId: string): Promise<string> {
     console.log(`[Transcript] Trying watch page scrape...`);
@@ -249,43 +242,18 @@ async function fetchViaWatchPage(videoId: string): Promise<string> {
 
     console.log(`[Transcript] Watch page: ${tracks.length} tracks`);
 
-    // Prefer English
     const enTrack = tracks.find((t: any) => t.languageCode === "en" || t.languageCode?.startsWith("en"));
     const track = enTrack || tracks[0];
 
-    // Fetch caption content with cookies from the page
-    const cookies: string[] = ["CONSENT=YES+yt.453767867.en+FP+XXXXXXXXXX"];
-    res.headers.forEach((value, key) => {
-        if (key.toLowerCase() === "set-cookie") {
-            cookies.push(value.split(";")[0]);
-        }
-    });
-
-    // Try fetching with mobile UA (important: the caption server responds differently per UA)
-    const mobileUA = "com.google.android.youtube/19.09.37 (Linux; U; Android 12; US) gzip";
+    // Reuse cookies passed in env
     const captRes = await fetchWithNoCache(track.baseUrl, {
         headers: {
-            "User-Agent": mobileUA,
-            "Cookie": cookies.join("; "),
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         },
     });
 
     const xml = await captRes.text();
-    if (!xml || xml.length === 0) {
-        // Try with browser UA
-        const captRes2 = await fetchWithNoCache(track.baseUrl, {
-            headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Cookie": cookies.join("; "),
-                "Referer": `https://www.youtube.com/watch?v=${videoId}`,
-            },
-        });
-        const xml2 = await captRes2.text();
-        if (!xml2 || xml2.length === 0) throw new Error("Caption content empty");
-        const text = parseCaptionXml(xml2);
-        if (!text || text.length < 10) throw new Error("Parse failed");
-        return text;
-    }
+    if (!xml || xml.length === 0) throw new Error("Caption content empty");
 
     const text = parseCaptionXml(xml);
     if (!text || text.length < 10) throw new Error("Parse failed");
@@ -295,8 +263,7 @@ async function fetchViaWatchPage(videoId: string): Promise<string> {
 }
 
 /**
- * Method 3: Piped API (Public Instances)
- * Piped is another privacy-friendly YouTube frontend with a stable API.
+ * Method 3: Piped API
  */
 async function fetchViaPiped(videoId: string): Promise<string> {
     const instances = [
@@ -320,11 +287,8 @@ async function fetchViaPiped(videoId: string): Promise<string> {
 
     console.log(`[Transcript] Trying Piped fallback (${instances.length} instances parallel)...`);
 
-    // Helper to fetch from a single instance
     const fetchOne = async (instance: string): Promise<string> => {
         try {
-            // NOTE: We passing empty User-Agent to mimic API environment, 
-            // as some Piped instances block browser UAs.
             const res = await fetchWithNoCache(`${instance}/streams/${videoId}`, {
                 signal: AbortSignal.timeout(8000),
                 headers: { "User-Agent": "" }
@@ -359,13 +323,11 @@ async function fetchViaPiped(videoId: string): Promise<string> {
         }
     };
 
-    // Race them all!
     try {
         const result = await Promise.any(instances.map(fetchOne));
         console.log(`[Transcript] ✓ Piped success`);
         return result;
     } catch (aggregateError: any) {
-        // Log all errors
         const errors = (aggregateError as AggregateError).errors;
         const errMsgs = errors.map((e: any) => e.message).join(" | ");
         console.warn(`[Transcript] Piped all failed: ${errMsgs}`);
@@ -374,8 +336,7 @@ async function fetchViaPiped(videoId: string): Promise<string> {
 }
 
 /**
- * Method 4: Invidious API (Public Instances)
- * Proxies requests through community-hosted instances to bypass IP blocks.
+ * Method 4: Invidious API
  */
 async function fetchViaInvidious(videoId: string): Promise<string> {
     const instances = [
@@ -397,11 +358,8 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
 
     console.log(`[Transcript] Trying Invidious fallback (${instances.length} instances parallel)...`);
 
-    // Helper to fetch from a single instance
     const fetchOne = async (instance: string): Promise<string> => {
         try {
-            // Step 1: Get caption tracks
-            // Use generic UA
             const res = await fetchWithNoCache(`${instance}/api/v1/captions/${videoId}`, {
                 signal: AbortSignal.timeout(8000),
                 headers: { "User-Agent": "" }
@@ -411,11 +369,9 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
             const tracks = await res.json();
             if (!Array.isArray(tracks) || tracks.length === 0) throw new Error("No caption tracks");
 
-            // Step 2: Find English track
             const enTrack = tracks.find((t: any) => t.languageCode === "en" || t.languageCode?.startsWith("en"));
             const track = enTrack || tracks[0];
 
-            // Step 3: Fetch content
             const contentUrl = `${instance}${track.url}`;
             const subRes = await fetchWithNoCache(contentUrl, {
                 signal: AbortSignal.timeout(8000),
@@ -426,20 +382,17 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
             const text = await subRes.text();
             if (!text || text.length < 50) throw new Error("Empty caption content");
 
-            const cleanText = text
+            return text
                 .replace(/WEBVTT/g, "")
                 .replace(/\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}/g, "")
                 .replace(/<[^>]*>/g, "")
                 .replace(/\n+/g, " ")
                 .trim();
-
-            return cleanText;
         } catch (e: any) {
             throw new Error(`${instance}: ${e.message}`);
         }
     };
 
-    // Race them all!
     try {
         const result = await Promise.any(instances.map(fetchOne));
         console.log(`[Transcript] ✓ Invidious success`);
@@ -453,8 +406,7 @@ async function fetchViaInvidious(videoId: string): Promise<string> {
 }
 
 /**
- * Method 5: Legacy Google Video API (The "Hail Mary")
- * Accesses safe/old timedtext endpoint.
+ * Method 5: Legacy Google Video API
  */
 async function fetchViaLegacyApi(videoId: string): Promise<string> {
     console.log(`[Transcript] Trying Legacy API...`);
@@ -493,7 +445,20 @@ export async function fetchTranscript(videoId: string): Promise<string> {
         console.warn(`[Transcript] Library method failed: ${e.message}`);
     }
 
-    // Method 1: Innertube API
+    // New Strategy: Prioritize cookie-based methods if cookies are present
+    const hasCookies = !!process.env.YOUTUBE_COOKIES;
+
+    // Method 1 (or 2): Watch page scraping (Highly robust with cookies)
+    if (hasCookies) {
+        try {
+            return await fetchViaWatchPage(videoId);
+        } catch (e: any) {
+            debugLogs.push(`WatchPage: ${e.message}`);
+            console.warn(`[Transcript] Watch page method failed: ${e.message}`);
+        }
+    }
+
+    // Method 2 (or 1): Innertube API
     try {
         return await fetchViaInnertube(videoId);
     } catch (e: any) {
@@ -502,7 +467,17 @@ export async function fetchTranscript(videoId: string): Promise<string> {
         console.warn(`[Transcript] Innertube methods failed: ${msg}`);
     }
 
-    // Method 2: Piped API (Parallel)
+    // If we haven't run WatchPage yet (no cookies), try it now as fallback
+    if (!hasCookies) {
+        try {
+            return await fetchViaWatchPage(videoId);
+        } catch (e: any) {
+            debugLogs.push(`WatchPage: ${e.message}`);
+            console.warn(`[Transcript] Watch page method failed: ${e.message}`);
+        }
+    }
+
+    // Method 3: Piped API (Parallel)
     try {
         return await fetchViaPiped(videoId);
     } catch (e: any) {
@@ -511,21 +486,13 @@ export async function fetchTranscript(videoId: string): Promise<string> {
         console.warn(`[Transcript] Piped method failed: ${msg}`);
     }
 
-    // Method 3: Invidious API (Parallel)
+    // Method 4: Invidious API (Parallel)
     try {
         return await fetchViaInvidious(videoId);
     } catch (e: any) {
         const msg = e.message.length > 100 ? e.message.substring(0, 100) + "..." : e.message;
         debugLogs.push(`Invidious: ${msg}`);
         console.warn(`[Transcript] Invidious method failed: ${msg}`);
-    }
-
-    // Method 4: Watch page scraping
-    try {
-        return await fetchViaWatchPage(videoId);
-    } catch (e: any) {
-        debugLogs.push(`WatchPage: ${e.message}`);
-        console.warn(`[Transcript] Watch page method failed: ${e.message}`);
     }
 
     // Method 5: Legacy API
