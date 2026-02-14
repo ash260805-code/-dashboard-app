@@ -1,6 +1,6 @@
 import { auth, signOut } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import prisma from "@/lib/db";
+import { prisma } from "@/lib/db";
 import Link from "next/link";
 
 async function getStats() {
