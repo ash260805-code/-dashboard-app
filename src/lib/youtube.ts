@@ -1,6 +1,12 @@
-
 import { YoutubeTranscript } from "youtube-transcript";
 import { HttpsProxyAgent } from "https-proxy-agent";
+import puppeteerCore from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
+import { addExtra } from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+
+const puppeteer = addExtra(puppeteerCore);
+puppeteer.use(StealthPlugin());
 
 // Robust fetch helper with no caching and browser headers
 async function fetchWithNoCache(url: string, options: RequestInit = {}): Promise<Response> {
@@ -99,7 +105,7 @@ async function fetchViaLibrary(videoId: string): Promise<string> {
 async function fetchViaInnertube(videoId: string): Promise<string> {
     const clients = [
         {
-            name: "WEB_COOKIES", // New: Tries to simulate normal browser playback
+            name: "WEB",
             ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             body: {
                 videoId,
@@ -114,6 +120,42 @@ async function fetchViaInnertube(videoId: string): Promise<string> {
                 playbackContext: {
                     contentPlaybackContext: {
                         html5Preference: "HTML5_PREF_WANTS",
+                    },
+                },
+                contentCheckOk: true,
+                racyCheckOk: true,
+            },
+        },
+        {
+            name: "IOS", // Often has different rate limits/blocks than Android/Web
+            ua: "com.google.ios.youtube/19.10.1 (iPhone16,2; U; CPU iOS 17_4_1 like Mac OS X; en_US)",
+            body: {
+                videoId,
+                context: {
+                    client: {
+                        clientName: "IOS",
+                        clientVersion: "19.10.1",
+                        deviceMake: "Apple",
+                        deviceModel: "iPhone16,2",
+                        hl: "en",
+                        gl: "US",
+                    },
+                },
+                contentCheckOk: true,
+                racyCheckOk: true,
+            },
+        },
+        {
+            name: "TV",
+            ua: "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version",
+            body: {
+                videoId,
+                context: {
+                    client: {
+                        clientName: "TVHTML5",
+                        clientVersion: "7.20230405",
+                        hl: "en",
+                        gl: "US",
                     },
                 },
                 contentCheckOk: true,
@@ -432,6 +474,118 @@ async function fetchViaLegacyApi(videoId: string): Promise<string> {
 }
 
 /**
+ * Method 6: Puppeteer Fallback (Headless Browser)
+ * resource-heavy but robust against simple bot detection
+ */
+async function fetchViaPuppeteer(videoId: string): Promise<string> {
+    console.log(`[Transcript] Trying Puppeteer fallback...`);
+    let browser = null;
+
+    try {
+        // Configure Chromium based on environment
+        // Local Windows development vs Vercel Lambda
+        const isLocal = process.platform === "win32";
+
+        const executablePath = isLocal
+            ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" // Common local path, might need adjustment
+            : await chromium.executablePath();
+
+        browser = await puppeteer.launch({
+            args: isLocal ? puppeteer.defaultArgs() : [
+                ...chromium.args,
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-infobars",
+                "--window-position=0,0",
+                "--ignore-certificate-errors",
+                "--ignore-certificate-errors-spki-list",
+                '--user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"'
+            ],
+            defaultViewport: { width: 1280, height: 720 },
+            executablePath: executablePath || (isLocal ? "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" : undefined),
+            headless: true,
+            ignoreDefaultArgs: ["--enable-automation"],
+        });
+
+        const page = await browser.newPage();
+
+        // Block images/fonts to save bandwidth
+        await page.setRequestInterception(true);
+        page.on('request', (req: any) => {
+            if (['image', 'stylesheet', 'font'].includes(req.resourceType())) {
+                req.abort();
+            } else {
+                req.continue();
+            }
+        });
+
+        // Set User-Agent to generic desktop
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+
+        if (process.env.YOUTUBE_COOKIES) {
+            try {
+                const cookieString = process.env.YOUTUBE_COOKIES;
+                const cookies = cookieString.split(';').map(pair => {
+                    const [name, value] = pair.split('=').map(c => c.trim());
+                    if (name && value) return { name, value, domain: '.youtube.com' };
+                    return null;
+                }).filter(Boolean) as any[];
+
+                if (cookies.length > 0) {
+                    await page.setCookie(...cookies);
+                    console.log(`[Transcript] Puppeteer: Injected ${cookies.length} cookies`);
+                }
+            } catch (e) {
+                console.warn("[Transcript] Failed to set cookies in Puppeteer", e);
+            }
+        }
+
+        console.log(`[Transcript] Puppeteer navigating to video...`);
+        const url = `https://www.youtube.com/watch?v=${videoId}`;
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+
+        // Extract ytInitialPlayerResponse
+        const playerResponse = await page.evaluate(() => {
+            // @ts-ignore
+            return window.ytInitialPlayerResponse || null;
+        });
+
+        if (!playerResponse) throw new Error("No player response found in DOM");
+
+        const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+        if (!tracks?.length) throw new Error("No caption tracks found via Puppeteer");
+
+        const enTrack = tracks.find((t: any) => t.languageCode === "en" || t.languageCode?.startsWith("en"));
+        const track = enTrack || tracks[0];
+
+        // Fetch the transcript content
+        // We can use page.evaluate to fetch it, or just use our efficient fetcher with the URL
+        // Fetching via page might be safer if cookies/session context matters
+        const captionUrl = track.baseUrl;
+
+        const xml = await page.evaluate(async (url: string) => {
+            const res = await fetch(url);
+            return await res.text();
+        }, captionUrl);
+
+        if (!xml || xml.length === 0) throw new Error("Empty caption content");
+
+        const text = parseCaptionXml(xml);
+        if (!text || text.length < 50) throw new Error("Parse failed");
+
+        console.log(`[Transcript] ✓ Puppeteer success: ${text.length} chars`);
+        return text;
+
+    } catch (e: any) {
+        throw new Error(`Puppeteer failed: ${e.message}`);
+    } finally {
+        if (browser) await browser.close();
+    }
+}
+
+
+/**
  * Master transcript fetcher: tries multiple methods in sequence.
  */
 export async function fetchTranscript(videoId: string): Promise<string> {
@@ -445,36 +599,21 @@ export async function fetchTranscript(videoId: string): Promise<string> {
         console.warn(`[Transcript] Library method failed: ${e.message}`);
     }
 
-    // New Strategy: Prioritize cookie-based methods if cookies are present
-    const hasCookies = !!process.env.YOUTUBE_COOKIES;
-
-    // Method 1 (or 2): Watch page scraping (Highly robust with cookies)
-    if (hasCookies) {
-        try {
-            return await fetchViaWatchPage(videoId);
-        } catch (e: any) {
-            debugLogs.push(`WatchPage: ${e.message}`);
-            console.warn(`[Transcript] Watch page method failed: ${e.message}`);
-        }
+    // Method 1: Watch page scraping
+    try {
+        return await fetchViaWatchPage(videoId);
+    } catch (e: any) {
+        debugLogs.push(`WatchPage: ${e.message}`);
+        console.warn(`[Transcript] Watch page method failed: ${e.message}`);
     }
 
-    // Method 2 (or 1): Innertube API
+    // Method 2: Innertube API
     try {
         return await fetchViaInnertube(videoId);
     } catch (e: any) {
         const msg = e.message.length > 100 ? e.message.substring(0, 100) + "..." : e.message;
         debugLogs.push(`Innertube: ${msg}`);
         console.warn(`[Transcript] Innertube methods failed: ${msg}`);
-    }
-
-    // If we haven't run WatchPage yet (no cookies), try it now as fallback
-    if (!hasCookies) {
-        try {
-            return await fetchViaWatchPage(videoId);
-        } catch (e: any) {
-            debugLogs.push(`WatchPage: ${e.message}`);
-            console.warn(`[Transcript] Watch page method failed: ${e.message}`);
-        }
     }
 
     // Method 3: Piped API (Parallel)
@@ -503,11 +642,29 @@ export async function fetchTranscript(videoId: string): Promise<string> {
         console.warn(`[Transcript] Legacy method failed: ${e.message}`);
     }
 
+    // Method 6: Puppeteer (Final Resort)
+    try {
+        return await fetchViaPuppeteer(videoId);
+    } catch (e: any) {
+        // Don't log full error if it's just path missing locally
+        const msg = e.message.length > 200 ? e.message.substring(0, 200) + "..." : e.message;
+        debugLogs.push(`Puppeteer: ${msg}`);
+        console.warn(`[Transcript] Puppeteer method failed: ${msg}`);
+    }
+
     // Capture logs in server console for admins
     console.error("Transcript Fetch Failure Logs:", JSON.stringify(debugLogs, null, 2));
 
     // Throw a detailed error for the user to share
     const logStr = debugLogs.join(" | ").substring(0, 300); // Truncate for UI
+
+    // Check if failure was due to Login Required
+    if (logStr.includes("LOGIN_REQUIRED") || logStr.includes("Sign in")) {
+        throw new Error(
+            `Transcript unavailable (Login Required). Puppeteer fallback also failed. Debug: [${logStr}...]`
+        );
+    }
+
     throw new Error(
         `Failed to fetch transcript. Debug: [${logStr}...]`
     );

@@ -2,7 +2,7 @@
 import { fetchTranscript } from "./src/lib/youtube";
 
 async function test() {
-    const videoId = "Vxs5zw0NOvU"; // The video causing the error
+    const videoId = "PkZNo7MFNFg"; // The video causing the error
     console.log(`Testing video: ${videoId}`);
 
     try {
