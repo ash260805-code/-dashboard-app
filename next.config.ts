@@ -9,7 +9,10 @@ const nextConfig: NextConfig = {
     "puppeteer-extra-plugin-stealth",
     "merge-deep",
     "clone-deep",
-    "is-plain-object"
+    "is-plain-object",
+    "kind-of",
+    "shallow-clone",
+    "deep-extend"
   ],
 };
 

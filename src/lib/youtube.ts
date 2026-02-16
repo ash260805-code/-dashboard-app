@@ -659,16 +659,26 @@ export async function fetchTranscript(videoId: string): Promise<string> {
     console.error("Transcript Fetch Failure Logs:", JSON.stringify(debugLogs, null, 2));
 
     // Throw a detailed error for the user to share
-    const logStr = debugLogs.join(" | ").substring(0, 300); // Truncate for UI
+    const pupLog = debugLogs.find(l => l.startsWith("Puppeteer:")) || "";
+    const otherLogs = debugLogs.filter(l => !l.startsWith("Puppeteer:")).join(" | ");
+
+    const combinedLog = `${pupLog} | ${otherLogs}`.substring(0, 500); // Increased limit slightly
 
     // Check if failure was due to Login Required
-    if (logStr.includes("LOGIN_REQUIRED") || logStr.includes("Sign in")) {
+    if (combinedLog.includes("LOGIN_REQUIRED") || combinedLog.includes("Sign in")) {
+        // If Puppeteer failed specifically, mention why
+        if (pupLog && !pupLog.includes("LOGIN_REQUIRED") && !pupLog.includes("Sign in")) {
+            throw new Error(
+                `Transcript unavailable. Puppeteer Error: ${pupLog.replace("Puppeteer:", "").trim()}. (Login also required for other methods).`
+            );
+        }
+
         throw new Error(
-            `Transcript unavailable (Login Required). Puppeteer fallback also failed. Debug: [${logStr}...]`
+            `Transcript unavailable (Login Required). Puppeteer fallback also failed. Debug: [${combinedLog}...]`
         );
     }
 
     throw new Error(
-        `Failed to fetch transcript. Debug: [${logStr}...]`
+        `Failed to fetch transcript. Debug: [${combinedLog}...]`
     );
 }
