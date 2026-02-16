@@ -592,6 +592,8 @@ async function fetchViaPuppeteer(videoId: string): Promise<string> {
  * Master transcript fetcher: tries multiple methods in sequence.
  */
 export async function fetchTranscript(videoId: string): Promise<string> {
+    console.log(`[Transcript] --- DEPLOYMENT: BUNDLED DEPS FIX v1 ---`);
+    console.log(`[Transcript] Fetching for videoId: ${videoId}`);
     const debugLogs: string[] = [];
 
     // Method 0: Library (New Primary)
