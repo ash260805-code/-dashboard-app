@@ -22,6 +22,7 @@
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.4",
     "https-proxy-agent": "^7.0.6",
+    "is-plain-object": "^5.0.0",
     "next": "16.1.6",
     "next-auth": "^5.0.0-beta.30",
     "puppeteer-core": "^24.37.3",
