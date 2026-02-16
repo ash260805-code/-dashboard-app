@@ -1,6 +1,12 @@
 import { YoutubeTranscript } from "youtube-transcript";
 import { HttpsProxyAgent } from "https-proxy-agent";
-// Puppeteer imports moved to dynamic import inside fetchViaPuppeteer to avoid build issues
+import chromium from "@sparticuz/chromium";
+import puppeteerCore from "puppeteer-core";
+import puppeteerExtra from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+
+// Explicitly bundle is-plain-object to ensure it's available for clone-deep
+import "is-plain-object";
 
 // Robust fetch helper with no caching and browser headers
 async function fetchWithNoCache(url: string, options: RequestInit = {}): Promise<Response> {
@@ -472,18 +478,14 @@ async function fetchViaLegacyApi(videoId: string): Promise<string> {
  * resource-heavy but robust against simple bot detection
  */
 async function fetchViaPuppeteer(videoId: string): Promise<string> {
-    console.log(`[Transcript] Trying Puppeteer fallback...`);
+    console.log(`[Transcript] Trying Puppeteer fallback (Top-Level Imports)...`);
     let browser = null;
 
     try {
-        // Dynamic imports to avoid build-time bundling issues
-        const puppeteerCore = (await import("puppeteer-core")).default;
-        const chromium = (await import("@sparticuz/chromium")).default;
-        const { addExtra } = await import("puppeteer-extra");
-        const StealthPlugin = (await import("puppeteer-extra-plugin-stealth")).default;
+        const puppeteer = (puppeteerExtra as any).default || puppeteerExtra;
+        const stealth = (StealthPlugin as any).default || StealthPlugin;
 
-        const puppeteer = addExtra(puppeteerCore as any);
-        puppeteer.use(StealthPlugin());
+        puppeteer.use(stealth());
 
         // Configure Chromium based on environment
         // Local Windows development vs Vercel Lambda
@@ -592,7 +594,7 @@ async function fetchViaPuppeteer(videoId: string): Promise<string> {
  * Master transcript fetcher: tries multiple methods in sequence.
  */
 export async function fetchTranscript(videoId: string): Promise<string> {
-    console.log(`[Transcript] --- DEPLOYMENT: BUNDLE V3 ---`);
+    console.log(`[Transcript] --- DEPLOYMENT: TOP-LEVEL IMPORTS v4 ---`);
     console.log(`[Transcript] Fetching for videoId: ${videoId}`);
     const debugLogs: string[] = [];
 
