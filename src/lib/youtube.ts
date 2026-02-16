@@ -1,12 +1,6 @@
 import { YoutubeTranscript } from "youtube-transcript";
 import { HttpsProxyAgent } from "https-proxy-agent";
-import puppeteerCore from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
-import { addExtra } from "puppeteer-extra";
-import StealthPlugin from "puppeteer-extra-plugin-stealth";
-
-const puppeteer = addExtra(puppeteerCore);
-puppeteer.use(StealthPlugin());
+// Puppeteer imports moved to dynamic import inside fetchViaPuppeteer to avoid build issues
 
 // Robust fetch helper with no caching and browser headers
 async function fetchWithNoCache(url: string, options: RequestInit = {}): Promise<Response> {
@@ -482,6 +476,15 @@ async function fetchViaPuppeteer(videoId: string): Promise<string> {
     let browser = null;
 
     try {
+        // Dynamic imports to avoid build-time bundling issues
+        const puppeteerCore = (await import("puppeteer-core")).default;
+        const chromium = (await import("@sparticuz/chromium")).default;
+        const { addExtra } = await import("puppeteer-extra");
+        const StealthPlugin = (await import("puppeteer-extra-plugin-stealth")).default;
+
+        const puppeteer = addExtra(puppeteerCore as any);
+        puppeteer.use(StealthPlugin());
+
         // Configure Chromium based on environment
         // Local Windows development vs Vercel Lambda
         const isLocal = process.platform === "win32";
