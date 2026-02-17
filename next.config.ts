@@ -5,9 +5,10 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [
     "@sparticuz/chromium",
     "puppeteer-core",
-    "puppeteer-extra",
     "puppeteer-extra-plugin-stealth",
-    "is-plain-object"
+    "is-plain-object",
+    "merge-deep",
+    "clone-deep"
   ],
 };
 

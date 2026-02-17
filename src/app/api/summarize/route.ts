@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { extractVideoId, fetchTranscript } from "@/lib/youtube";
 
+// Force inclusion of is-plain-object for Vercel
+try { require("is-plain-object"); } catch (e) { /* ignore */ }
+
+
 export async function POST(request: NextRequest) {
     try {
         const session = await auth();
