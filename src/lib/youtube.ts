@@ -23,7 +23,6 @@ export async function fetchTranscript(videoId: string): Promise<string> {
             writeSub: true,
             subLang: 'en',
             output: '-', // Stdout
-            dumbMode: true, // cleaner output
             noWarnings: true,
             // We actually need the subtitle CONTENT, not just the file.
             // youtube-dl-exec usually executes the command. 
