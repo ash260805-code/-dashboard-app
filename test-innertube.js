@@ -1,11 +1,12 @@
 const { Innertube, UniversalCache } = require('youtubei.js');
 
 async function test() {
-    console.log("Testing Innertube...");
+    console.log("Testing Innertube with latest version...");
     try {
         const youtube = await Innertube.create({
             cache: new UniversalCache(false),
-            // generate_session_locally: true, // Try without this first
+            generate_session_locally: true,
+            client_type: 'IOS' // Try IOS client
         });
         console.log("Innertube initialized.");
         const info = await youtube.getInfo('jNQXAC9IVRw');
