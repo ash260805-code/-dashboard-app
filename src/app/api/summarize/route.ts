@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const videoId = extractVideoId(videoUrl);
+        const videoId = await extractVideoId(videoUrl);
         if (!videoId) {
             return NextResponse.json(
                 { error: "Invalid YouTube URL. Please paste a valid YouTube video link." },
