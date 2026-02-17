@@ -103,21 +103,37 @@ async function fetchViaLibrary(videoId: string): Promise<string> {
 async function fetchViaInnertube(videoId: string): Promise<string> {
     const clients = [
         {
-            name: "WEB",
-            ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            name: "ANDROID",
+            ua: "com.google.android.youtube/19.09.37 (Linux; U; Android 12; US) gzip",
             body: {
                 videoId,
                 context: {
                     client: {
-                        clientName: "WEB",
-                        clientVersion: "2.20240217.09.00", // Recent web version
+                        clientName: "ANDROID",
+                        clientVersion: "19.09.37",
+                        androidSdkVersion: 31,
                         hl: "en",
                         gl: "US",
                     },
                 },
-                playbackContext: {
-                    contentPlaybackContext: {
-                        html5Preference: "HTML5_PREF_WANTS",
+                contentCheckOk: true,
+                racyCheckOk: true,
+            },
+        },
+        {
+            name: "TV_EMBEDDED",
+            ua: "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version",
+            body: {
+                videoId,
+                context: {
+                    client: {
+                        clientName: "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+                        clientVersion: "2.0",
+                        hl: "en",
+                        gl: "US",
+                    },
+                    thirdParty: {
+                        embedUrl: "https://www.google.com",
                     },
                 },
                 contentCheckOk: true,
@@ -161,37 +177,21 @@ async function fetchViaInnertube(videoId: string): Promise<string> {
             },
         },
         {
-            name: "ANDROID",
-            ua: "com.google.android.youtube/19.09.37 (Linux; U; Android 12; US) gzip",
+            name: "WEB",
+            ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             body: {
                 videoId,
                 context: {
                     client: {
-                        clientName: "ANDROID",
-                        clientVersion: "19.09.37",
-                        androidSdkVersion: 31,
+                        clientName: "WEB",
+                        clientVersion: "2.20240217.09.00", // Recent web version
                         hl: "en",
                         gl: "US",
                     },
                 },
-                contentCheckOk: true,
-                racyCheckOk: true,
-            },
-        },
-        {
-            name: "TV_EMBEDDED",
-            ua: "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version",
-            body: {
-                videoId,
-                context: {
-                    client: {
-                        clientName: "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
-                        clientVersion: "2.0",
-                        hl: "en",
-                        gl: "US",
-                    },
-                    thirdParty: {
-                        embedUrl: "https://www.google.com",
+                playbackContext: {
+                    contentPlaybackContext: {
+                        html5Preference: "HTML5_PREF_WANTS",
                     },
                 },
                 contentCheckOk: true,
