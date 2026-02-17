@@ -4,18 +4,28 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-    // Hash with 12 rounds, same as in register/route.ts
-    const hashedPassword = await bcrypt.hash("Ashwini123!", 12);
+    const email = "admin@example.com";
+    const password = "Admin123!"; // You can change this
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    const user = await prisma.user.update({
-        where: { email: "ash8867668742@gmail.com" },
-        data: {
+    const user = await prisma.user.upsert({
+        where: { email },
+        update: {
             password: hashedPassword,
-            status: "APPROVED" // Ensure approved status too
+            status: "APPROVED",
+            role: "ADMIN"
         },
+        create: {
+            email,
+            password: hashedPassword,
+            name: "Admin User",
+            role: "ADMIN",
+            status: "APPROVED"
+        }
     });
 
-    console.log("Updated password for:", user.email);
+    console.log(`\nSUCCESS: Admin user '${user.email}' is ready.`);
+    console.log(`Password: ${password}\n`);
 }
 
 main()
