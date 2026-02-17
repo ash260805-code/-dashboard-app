@@ -476,20 +476,14 @@ async function fetchViaLegacyApi(videoId: string): Promise<string> {
  * resource-heavy but robust against simple bot detection
  */
 async function fetchViaPuppeteer(videoId: string): Promise<string> {
-    console.log(`[Transcript] Trying Puppeteer fallback (Dynamic Imports)...`);
+    console.log(`[Transcript] Trying Puppeteer fallback (Vanilla Core)...`);
     let browser = null;
 
     try {
-        // Dynamic imports to avoid bundling issues
-        // @ts-ignore
-        const puppeteer = (await import("puppeteer-extra")).default;
-        // @ts-ignore
-        const StealthPlugin = (await import("puppeteer-extra-plugin-stealth")).default;
-
-        puppeteer.use(StealthPlugin());
+        // Use vanilla puppeteer-core to avoid dependency issues with puppeteer-extra
+        // (e.g. is-plain-object, merge-deep crashing on Vercel)
 
         // Configure Chromium based on environment
-        // Local Windows development vs Vercel Lambda
         const isLocal = process.platform === "win32";
 
         const executablePath = isLocal
@@ -504,8 +498,8 @@ async function fetchViaPuppeteer(videoId: string): Promise<string> {
             console.log(`[Transcript] Using local Chrome at: ${executablePath}`);
         }
 
-        browser = await puppeteer.launch({
-            args: isLocal ? puppeteer.defaultArgs() : [
+        browser = await puppeteerCore.launch({
+            args: isLocal ? ["--no-sandbox"] : [
                 ...chromium.args,
                 "--disable-blink-features=AutomationControlled",
                 "--no-sandbox",
@@ -514,11 +508,12 @@ async function fetchViaPuppeteer(videoId: string): Promise<string> {
                 "--window-position=0,0",
                 "--ignore-certificate-errors",
                 "--ignore-certificate-errors-spki-list",
-                '--user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"'
+                // 'stealth' args manually applied
+                '--user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"'
             ],
             defaultViewport: { width: 1280, height: 720 },
             executablePath: executablePath || (isLocal ? "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" : undefined),
-            headless: true,
+            headless: true, // simplified
             ignoreDefaultArgs: ["--enable-automation"],
         });
 
@@ -574,8 +569,6 @@ async function fetchViaPuppeteer(videoId: string): Promise<string> {
         const track = enTrack || tracks[0];
 
         // Fetch the transcript content
-        // We can use page.evaluate to fetch it, or just use our efficient fetcher with the URL
-        // Fetching via page might be safer if cookies/session context matters
         const captionUrl = track.baseUrl;
 
         const xml = await page.evaluate(async (url: string) => {
