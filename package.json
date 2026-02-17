@@ -26,7 +26,8 @@
     "pdf2json": "^4.0.2",
     "pdfreader": "^3.0.8",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "youtubei.js": "^16.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
