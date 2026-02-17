@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-const pdf = require("pdf-parse");
+// import PDFParser from "pdf2json"; 
+// Switching to a more robust text extraction
+const { PdfReader } = require("pdfreader");
 
 /**
  * Basic chunking utility for RAG
@@ -17,6 +19,18 @@ function chunkText(text: string, chunkSize: number = 1000, overlap: number = 200
     }
 
     return chunks;
+}
+
+// Helper to parse PDF buffer
+async function parsePdf(buffer: Buffer): Promise<string> {
+    return new Promise((resolve, reject) => {
+        let text = "";
+        new PdfReader().parseBuffer(buffer, (err: any, item: any) => {
+            if (err) reject(err);
+            else if (!item) resolve(text);
+            else if (item.text) text += item.text + " ";
+        });
+    });
 }
 
 export async function POST(req: NextRequest) {
@@ -37,13 +51,19 @@ export async function POST(req: NextRequest) {
         let content = "";
 
         if (file.type === "application/pdf") {
-            const data = await pdf(buffer);
-            content = data.text;
+            try {
+                content = await parsePdf(buffer);
+            } catch (e: any) {
+                console.error("PDF Parse Error:", e);
+                return NextResponse.json({ error: "Failed to parse PDF file." }, { status: 400 });
+            }
         } else if (file.type === "text/plain") {
             content = buffer.toString("utf-8");
         } else {
             return NextResponse.json({ error: "Unsupported file type. Use PDF or TXT." }, { status: 400 });
         }
+
+
 
         if (!content || content.trim().length === 0) {
             return NextResponse.json({ error: "File is empty or could not be parsed." }, { status: 400 });

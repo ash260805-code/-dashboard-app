@@ -43,7 +43,14 @@ export default function DocsPage() {
                 body: formData,
             });
 
-            const data = await res.json();
+            const text = await res.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                console.error("Failed to parse JSON:", text);
+                throw new Error(`Server Error: ${res.status} ${res.statusText}`);
+            }
             if (!res.ok) throw new Error(data.error || "Upload failed");
 
             setDocumentId(data.documentId);
@@ -72,7 +79,14 @@ export default function DocsPage() {
                 body: JSON.stringify({ message: userMsg, documentId }),
             });
 
-            const data = await res.json();
+            const text = await res.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                console.error("Failed to parse JSON:", text);
+                throw new Error(`Server Error: ${res.status} ${res.statusText}`);
+            }
             if (!res.ok) throw new Error(data.error || "Failed to get answer");
 
             setMessages(prev => [...prev, { role: "ai", content: data.answer }]);
@@ -124,8 +138,8 @@ export default function DocsPage() {
                                 type="submit"
                                 disabled={!file || uploading}
                                 className={`px-6 py-2 rounded-xl font-medium transition-all ${!file || uploading
-                                        ? "bg-white/10 text-gray-500 cursor-not-allowed"
-                                        : "bg-gradient-to-r from-blue-500 to-violet-500 text-white hover:shadow-lg hover:shadow-blue-500/25 active:scale-95"
+                                    ? "bg-white/10 text-gray-500 cursor-not-allowed"
+                                    : "bg-gradient-to-r from-blue-500 to-violet-500 text-white hover:shadow-lg hover:shadow-blue-500/25 active:scale-95"
                                     }`}
                             >
                                 {uploading ? "Processing..." : "Read Document"}
@@ -154,8 +168,8 @@ export default function DocsPage() {
                         {messages.map((m, i) => (
                             <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                                 <div className={`max-w-[80%] p-4 rounded-2xl ${m.role === "user"
-                                        ? "bg-violet-600 text-white rounded-br-none"
-                                        : "bg-white/10 text-gray-200 border border-white/10 rounded-bl-none"
+                                    ? "bg-violet-600 text-white rounded-br-none"
+                                    : "bg-white/10 text-gray-200 border border-white/10 rounded-bl-none"
                                     } shadow-lg`}>
                                     {m.content}
                                 </div>
