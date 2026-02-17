@@ -18,10 +18,7 @@ async function fetchWithNoCache(url: string, options: RequestInit = {}): Promise
     const inputHeaders = (options.headers as Record<string, string>) || {};
     const finalHeaders = { ...defaultHeaders, ...inputHeaders };
 
-    // Inject cookies if available and not already present
-    if (process.env.YOUTUBE_COOKIES && !finalHeaders["Cookie"]) {
-        finalHeaders["Cookie"] = process.env.YOUTUBE_COOKIES;
-    }
+
 
     const agent = process.env.HTTP_PROXY ? new HttpsProxyAgent(process.env.HTTP_PROXY) : undefined;
 
@@ -212,7 +209,7 @@ async function fetchViaInnertube(videoId: string): Promise<string> {
                     headers: {
                         "Content-Type": "application/json",
                         "User-Agent": client.ua,
-                        // Cookies are auto-injected by fetchWithNoCache
+
                     },
                     body: JSON.stringify(client.body),
                 }
@@ -285,7 +282,6 @@ async function fetchViaWatchPage(videoId: string): Promise<string> {
     const enTrack = tracks.find((t: any) => t.languageCode === "en" || t.languageCode?.startsWith("en"));
     const track = enTrack || tracks[0];
 
-    // Reuse cookies passed in env
     const captRes = await fetchWithNoCache(track.baseUrl, {
         headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -532,23 +528,7 @@ async function fetchViaPuppeteer(videoId: string): Promise<string> {
         // Set User-Agent to generic desktop
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
 
-        if (process.env.YOUTUBE_COOKIES) {
-            try {
-                const cookieString = process.env.YOUTUBE_COOKIES;
-                const cookies = cookieString.split(';').map(pair => {
-                    const [name, value] = pair.split('=').map(c => c.trim());
-                    if (name && value) return { name, value, domain: '.youtube.com' };
-                    return null;
-                }).filter(Boolean) as any[];
 
-                if (cookies.length > 0) {
-                    await page.setCookie(...cookies);
-                    console.log(`[Transcript] Puppeteer: Injected ${cookies.length} cookies`);
-                }
-            } catch (e) {
-                console.warn("[Transcript] Failed to set cookies in Puppeteer", e);
-            }
-        }
 
         console.log(`[Transcript] Puppeteer navigating to video...`);
         const url = `https://www.youtube.com/watch?v=${videoId}`;
