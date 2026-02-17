@@ -8,15 +8,39 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  role      Role     @default(USER)
-  status    Status   @default(PENDING)
-  createdAt DateTime @default(now())
-  updatedAt    DateTime      @updatedAt
+  id           String                 @id @default(cuid())
+  email        String                 @unique
+  password     String
+  name         String?
+  role         Role                   @default(USER)
+  status       Status                 @default(PENDING)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
   transactions FinancialTransaction[]
+  documents    Document[]
+}
+
+model Document {
+  id        String          @id @default(cuid())
+  name      String
+  type      String // e.g., "application/pdf"
+  content   String? // Full text (optional, for reference)
+  createdAt DateTime        @default(now())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id])
+  chunks    DocumentChunk[]
+}
+
+model DocumentChunk {
+  id         String   @id @default(cuid())
+  content    String   @db.Text
+  tokenCount Int?
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  // For future-proofing vector search if needed
+  // embedding Json? 
 }
 
 enum Role {
@@ -31,13 +55,13 @@ enum Status {
 }
 
 model FinancialTransaction {
-  id        String   @id @default(cuid())
+  id        String                     @id @default(cuid())
   amount    Float
   status    FinancialTransactionStatus @default(PENDING)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime                   @default(now())
+  updatedAt DateTime                   @updatedAt
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User                       @relation(fields: [userId], references: [id])
 }
 
 enum FinancialTransactionStatus {
@@ -45,3 +69,4 @@ enum FinancialTransactionStatus {
   COMPLETED
   FAILED
 }
+

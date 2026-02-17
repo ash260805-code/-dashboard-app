@@ -128,27 +128,49 @@ export default async function DashboardPage() {
                     </div>
                 </div>
 
-                {/* AI Tools Card */}
-                <Link href="/dashboard/ai-tools" className="block mb-8 group">
-                    <div className="backdrop-blur-xl bg-gradient-to-r from-pink-500/10 via-violet-500/10 to-purple-500/10 border border-violet-500/30 rounded-2xl p-6 hover:border-violet-400/50 transition-all">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 rounded-xl bg-gradient-to-tr from-pink-500 to-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                {/* AI Tools Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    {/* YouTube Summarizer */}
+                    <Link href="/dashboard/ai-tools" className="group">
+                        <div className="h-full backdrop-blur-xl bg-gradient-to-br from-pink-500/10 via-violet-500/10 to-purple-500/10 border border-violet-500/30 rounded-2xl p-6 hover:border-violet-400/50 transition-all">
+                            <div className="flex flex-col h-full">
+                                <div className="w-14 h-14 rounded-xl bg-gradient-to-tr from-pink-500 to-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform mb-4">
                                     <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                                     </svg>
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-bold text-white">🎥 AI YouTube Summarizer</h2>
-                                    <p className="text-gray-400">Paste a YouTube link → Get AI-powered summary & study notes</p>
+                                    <h2 className="text-xl font-bold text-white mb-2">🎥 YouTube AI</h2>
+                                    <p className="text-gray-400 text-sm">Paste a link → Get summary & notes</p>
+                                </div>
+                                <div className="mt-auto pt-4 flex items-center text-violet-400 text-sm font-medium group-hover:gap-2 transition-all">
+                                    Open Tool <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
                                 </div>
                             </div>
-                            <svg className="w-6 h-6 text-violet-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
                         </div>
-                    </div>
-                </Link>
+                    </Link>
+
+                    {/* Document Q&A */}
+                    <Link href="/dashboard/docs" className="group">
+                        <div className="h-full backdrop-blur-xl bg-gradient-to-br from-blue-500/10 via-cyan-500/10 to-teal-500/10 border border-blue-500/30 rounded-2xl p-6 hover:border-blue-400/50 transition-all">
+                            <div className="flex flex-col h-full">
+                                <div className="w-14 h-14 rounded-xl bg-gradient-to-tr from-blue-500 to-cyan-600 flex items-center justify-center group-hover:scale-110 transition-transform mb-4">
+                                    <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-white mb-2">📄 Document RAG</h2>
+                                    <p className="text-gray-400 text-sm">Upload PDF/Text → Ask questions AI</p>
+                                </div>
+                                <div className="mt-auto pt-4 flex items-center text-blue-400 text-sm font-medium group-hover:gap-2 transition-all">
+                                    Open Tool <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                                </div>
+                            </div>
+                        </div>
+                    </Link>
+                </div>
+
 
                 {/* Recent Users */}
                 <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
