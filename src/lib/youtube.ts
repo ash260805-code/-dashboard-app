@@ -24,12 +24,15 @@ export async function fetchTranscript(videoId: string): Promise<string> {
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
     try {
-        // Use --dump-single-json to get metadata
-        const rawJson: any = await youtubedl(videoUrl, {
+        const flags: any = {
             dumpSingleJson: true,
             skipDownload: true,
             noWarnings: true,
-        });
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            extractorArgs: 'youtube:player_client=android',
+        };
+
+        const rawJson: any = await youtubedl(videoUrl, flags);
 
         // Parse JSON to find captions
         const automaticCaptions = rawJson.automatic_captions || {};
@@ -59,12 +62,17 @@ export async function fetchTranscript(videoId: string): Promise<string> {
         return cleanSubtitleText(textData);
 
     } catch (error: any) {
-        console.error("[Transcript] yt-dlp failed:", error.message);
+        console.error("[Transcript] yt-dlp failed full error:", error);
+        console.error("[Transcript] yt-dlp stderr:", error.stderr || "No stderr");
+
         // Fallback or detailed error logging
-        if (error.message.includes("ENOENT")) {
+        if (error.message?.includes("ENOENT")) {
             console.error(`[Transcript] Binary not found at ${binaryPath}. Did postinstall run?`);
         }
-        throw new Error(`Failed to fetch transcript: ${error.message}`);
+        if (error.stderr?.includes("Sign in to confirm you’re not a bot")) {
+            throw new Error("YouTube blocked the request. Please configure YOUTUBE_COOKIES in Vercel environment variables.");
+        }
+        throw new Error(`Failed to fetch transcript: ${error.stderr || error.message || "Unknown error"}`);
     }
 }
 

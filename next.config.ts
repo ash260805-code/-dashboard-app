@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
     "@sparticuz/chromium",
     "puppeteer-core"
   ],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
+  },
+  outputFileTracingIncludes: {
+    '/api/**/*': ['./bin/**/*'],
+  },
 };
 
 export default nextConfig;
