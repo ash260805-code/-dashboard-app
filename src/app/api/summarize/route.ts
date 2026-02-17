@@ -151,9 +151,14 @@ ${truncated}`;
 
         return NextResponse.json({ summary, notes, videoId });
     } catch (error: any) {
-        console.error("[Summarize] Unexpected error:", error.message || error);
+        console.error("[Summarize] API Route Error:", error);
+        // Log the full error object for debugging
+        if (error instanceof Error) {
+            console.error(error.stack);
+        }
+
         return NextResponse.json(
-            { error: `An unexpected error occurred: ${error.message || "Unknown error"}. Please try again later.` },
+            { error: error.message || "An unexpected error occurred. Please try again later." },
             { status: 500 }
         );
     }

@@ -2,11 +2,9 @@ import { YoutubeTranscript } from "youtube-transcript";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import chromium from "@sparticuz/chromium";
 import puppeteerCore from "puppeteer-core";
-import puppeteerExtra from "puppeteer-extra";
-import StealthPlugin from "puppeteer-extra-plugin-stealth";
+// puppeteer-extra and plugins are now imported dynamically in fetchViaPuppeteer
+// to avoid bundling issues in Vercel/Next.js environment
 
-// Explicitly bundle is-plain-object to ensure it's available for clone-deep
-import "is-plain-object";
 
 // Robust fetch helper with no caching and browser headers
 async function fetchWithNoCache(url: string, options: RequestInit = {}): Promise<Response> {
@@ -478,22 +476,33 @@ async function fetchViaLegacyApi(videoId: string): Promise<string> {
  * resource-heavy but robust against simple bot detection
  */
 async function fetchViaPuppeteer(videoId: string): Promise<string> {
-    console.log(`[Transcript] Trying Puppeteer fallback (Top-Level Imports)...`);
+    console.log(`[Transcript] Trying Puppeteer fallback (Dynamic Imports)...`);
     let browser = null;
 
     try {
-        const puppeteer = (puppeteerExtra as any).default || puppeteerExtra;
-        const stealth = (StealthPlugin as any).default || StealthPlugin;
+        // Dynamic imports to avoid bundling issues
+        // @ts-ignore
+        const puppeteer = (await import("puppeteer-extra")).default;
+        // @ts-ignore
+        const StealthPlugin = (await import("puppeteer-extra-plugin-stealth")).default;
 
-        puppeteer.use(stealth());
+        puppeteer.use(StealthPlugin());
 
         // Configure Chromium based on environment
         // Local Windows development vs Vercel Lambda
         const isLocal = process.platform === "win32";
 
         const executablePath = isLocal
-            ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" // Common local path, might need adjustment
+            ? (
+                require("fs").existsSync("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe")
+                    ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+                    : "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+            )
             : await chromium.executablePath();
+
+        if (isLocal) {
+            console.log(`[Transcript] Using local Chrome at: ${executablePath}`);
+        }
 
         browser = await puppeteer.launch({
             args: isLocal ? puppeteer.defaultArgs() : [
