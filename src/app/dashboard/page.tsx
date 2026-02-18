@@ -150,18 +150,18 @@ export default async function DashboardPage() {
                         </div>
                     </Link>
 
-                    {/* Document Q&A */}
-                    <Link href="/dashboard/docs" className="group">
+                    {/* AI Workspaces */}
+                    <Link href="/workspaces" className="group">
                         <div className="h-full backdrop-blur-xl bg-gradient-to-br from-blue-500/10 via-cyan-500/10 to-teal-500/10 border border-blue-500/30 rounded-2xl p-6 hover:border-blue-400/50 transition-all">
                             <div className="flex flex-col h-full">
                                 <div className="w-14 h-14 rounded-xl bg-gradient-to-tr from-blue-500 to-cyan-600 flex items-center justify-center group-hover:scale-110 transition-transform mb-4">
                                     <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                     </svg>
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-bold text-white mb-2">📄 Document RAG</h2>
-                                    <p className="text-gray-400 text-sm">Upload PDF/Text → Ask questions AI</p>
+                                    <h2 className="text-xl font-bold text-white mb-2">🧠 AI Workspaces</h2>
+                                    <p className="text-gray-400 text-sm">Manage docs & Deep Search</p>
                                 </div>
                                 <div className="mt-auto pt-4 flex items-center text-blue-400 text-sm font-medium group-hover:gap-2 transition-all">
                                     Open Tool <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
