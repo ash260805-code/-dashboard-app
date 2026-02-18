@@ -48,14 +48,14 @@ export async function POST(req: NextRequest) {
         const rankedChunks = allChunks
             .map((chunk) => {
                 if (!chunk.embedding || chunk.embedding.length === 0) return null;
-                return {
-                    ...chunk,
-                    score: cosineSimilarity(queryEmbedding, chunk.embedding),
-                };
+                const score = cosineSimilarity(queryEmbedding, chunk.embedding);
+                return { ...chunk, score };
             })
-            .filter((chunk) => chunk !== null && chunk.score > 0.3) // Filter low relevance
+            .filter((chunk) => chunk !== null && chunk.score > 0.2) // Filter low relevance
             .sort((a, b) => b!.score - a!.score)
             .slice(0, 5); // Top 5 chunks
+
+        console.log(`[Quick RAG] Found ${rankedChunks.length} chunks for query: "${message}"`);
 
         const contextItems: ContextItem[] = rankedChunks.map((chunk) => ({
             id: chunk!.id,

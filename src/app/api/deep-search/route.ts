@@ -21,6 +21,8 @@ export async function POST(req: NextRequest) {
         // 1. Perform Web Search (Firecrawl)
         const webResults = await searchAndScrape(query);
 
+        console.log(`[Deep Search] Found ${webResults?.length || 0} web results.`);
+
         if (!webResults || webResults.length === 0) {
             return NextResponse.json({
                 answer: "I couldn't find any relevant information on the web for that topic.",

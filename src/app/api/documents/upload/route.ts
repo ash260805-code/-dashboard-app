@@ -22,14 +22,21 @@ function chunkText(text: string, chunkSize: number = 1000, overlap: number = 200
 }
 
 // Helper to parse PDF buffer
-async function parsePdf(buffer: Buffer): Promise<string> {
+async function parsePDF(buffer: Buffer): Promise<string> {
+    const PDFParser = require("pdf2json");
     return new Promise((resolve, reject) => {
-        let text = "";
-        new PdfReader().parseBuffer(buffer, (err: any, item: any) => {
-            if (err) reject(err);
-            else if (!item) resolve(text);
-            else if (item.text) text += item.text + " ";
+        const pdfParser = new PDFParser(null, true);
+
+        pdfParser.on("pdfParser_dataError", (errData: any) =>
+            reject(new Error(errData.parserError))
+        );
+
+        pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
+            const text = pdfParser.getRawTextContent();
+            resolve(text);
         });
+
+        pdfParser.parseBuffer(buffer);
     });
 }
 
@@ -52,7 +59,7 @@ export async function POST(req: NextRequest) {
 
         if (file.type === "application/pdf") {
             try {
-                content = await parsePdf(buffer);
+                content = await parsePDF(buffer);
             } catch (e: any) {
                 console.error("PDF Parse Error:", e);
                 return NextResponse.json({ error: "Failed to parse PDF file." }, { status: 400 });
@@ -62,8 +69,6 @@ export async function POST(req: NextRequest) {
         } else {
             return NextResponse.json({ error: "Unsupported file type. Use PDF or TXT." }, { status: 400 });
         }
-
-
 
         if (!content || content.trim().length === 0) {
             return NextResponse.json({ error: "File is empty or could not be parsed." }, { status: 400 });
@@ -75,7 +80,7 @@ export async function POST(req: NextRequest) {
             data: {
                 name: file.name,
                 type: file.type,
-                content: content.substring(0, 1000), // Store sample of content
+                content: content,
                 userId: session.user.id,
             },
         });
@@ -83,14 +88,20 @@ export async function POST(req: NextRequest) {
         // Split into chunks for RAG
         const chunks = chunkText(content);
 
-        // Batch create chunks
-        // @ts-ignore
-        await (prisma as any).documentChunk.createMany({
-            data: chunks.map((c) => ({
-                content: c,
-                documentId: document.id,
-            })),
+        // Generate embeddings and Save (Sequential or limited parallel for stability)
+        const chunkPromises = chunks.map(async (text) => {
+            const embedding = await generateEmbedding(text);
+            // @ts-ignore
+            return (prisma as any).documentChunk.create({
+                data: {
+                    content: text,
+                    documentId: document.id,
+                    embedding_json: JSON.stringify(embedding),
+                },
+            });
         });
+
+        await Promise.all(chunkPromises);
 
         return NextResponse.json({
             message: "File uploaded and processed successfully",
