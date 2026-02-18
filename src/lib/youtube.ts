@@ -1,4 +1,4 @@
-import { create } from 'youtube-dl-exec';
+import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 
@@ -16,30 +16,33 @@ if (process.platform !== 'win32' && fs.existsSync(binaryPath)) {
     }
 }
 
-// Initialize youtube-dl-exec with the standalone binary
-const youtubedl = create(binaryPath);
-
 export async function fetchTranscript(videoId: string): Promise<string> {
     console.log(`[Transcript] Fetching for videoId: ${videoId} using standalone yt-dlp at ${binaryPath}`);
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
     try {
-        const flags: any = {
-            dumpSingleJson: true,
-            skipDownload: true,
-            noWarnings: true,
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            extractorArgs: 'youtube:player_client=android',
-        };
+        // Build the command with explicit quoting for paths with spaces
+        const quotedBinary = `"${binaryPath}"`;
+        const flags = [
+            '--dump-single-json',
+            '--skip-download',
+            '--no-warnings',
+            '--user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"',
+            '--extractor-args "youtube:player_client=android"'
+        ].join(' ');
 
-        const rawJson: any = await youtubedl(videoUrl, flags);
+        const command = `${quotedBinary} ${flags} "${videoUrl}"`;
+        console.log(`[Transcript] Executing: ${command}`);
+
+        const stdout = execSync(command, { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
+        const rawJson = JSON.parse(stdout);
 
         // Parse JSON to find captions
         const automaticCaptions = rawJson.automatic_captions || {};
         const captions = rawJson.subtitles || {};
 
         // Prioritize manual English subs, then auto English
-        const enSubs = captions.en || automaticCaptions.en || [];
+        const enSubs = (captions && captions.en) || (automaticCaptions && automaticCaptions.en) || [];
 
         if (!enSubs || enSubs.length === 0) {
             throw new Error("No English captions found.");
@@ -62,17 +65,16 @@ export async function fetchTranscript(videoId: string): Promise<string> {
         return cleanSubtitleText(textData);
 
     } catch (error: any) {
-        console.error("[Transcript] yt-dlp failed full error:", error);
-        console.error("[Transcript] yt-dlp stderr:", error.stderr || "No stderr");
+        console.error("[Transcript] yt-dlp failed:");
+        const stderr = error.stderr?.toString() || "";
+        console.error("Stderr:", stderr || "No stderr");
+        console.error("Message:", error.message);
 
-        // Fallback or detailed error logging
-        if (error.message?.includes("ENOENT")) {
-            console.error(`[Transcript] Binary not found at ${binaryPath}. Did postinstall run?`);
-        }
-        if (error.stderr?.includes("Sign in to confirm you’re not a bot")) {
+        if (stderr.includes("Sign in to confirm you’re not a bot")) {
             throw new Error("YouTube blocked the request. Please configure YOUTUBE_COOKIES in Vercel environment variables.");
         }
-        throw new Error(`Failed to fetch transcript: ${error.stderr || error.message || "Unknown error"}`);
+
+        throw new Error(`Failed to fetch transcript: ${stderr || error.message || "Unknown error"}`);
     }
 }
 
@@ -96,7 +98,7 @@ function cleanSubtitleText(rawData: string): string {
     return text;
 }
 
-export function extractVideoId(url: string): string | null {
+export async function extractVideoId(url: string): Promise<string | null> {
     const patterns = [
         /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
         /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
