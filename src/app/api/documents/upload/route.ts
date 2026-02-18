@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-// import PDFParser from "pdf2json"; 
-// Switching to a more robust text extraction
-const { PdfReader } = require("pdfreader");
+import { generateEmbedding } from "@/lib/ai";
 
 /**
  * Basic chunking utility for RAG
