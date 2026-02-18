@@ -71,7 +71,7 @@ export async function fetchTranscript(videoId: string): Promise<string> {
         console.error("Message:", error.message);
 
         if (stderr.includes("Sign in to confirm you’re not a bot")) {
-            throw new Error("YouTube blocked the request. Please configure YOUTUBE_COOKIES in Vercel environment variables.");
+            throw new Error("YouTube has blocked the request due to bot detection. Try again later or use a different video.");
         }
 
         throw new Error(`Failed to fetch transcript: ${stderr || error.message || "Unknown error"}`);
