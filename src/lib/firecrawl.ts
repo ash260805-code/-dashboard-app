@@ -16,25 +16,27 @@ export async function searchAndScrape(query: string) {
     }
 
     try {
+        console.log(`Searching Firecrawl for: ${query}`);
+        // Remove scrapeOptions for faster/more reliable response on Vercel
         const searchResponse = await app.search(query, {
-            scrapeOptions: {
-                formats: ["markdown"]
-            },
-            limit: 3
+            limit: 5
         } as any);
 
         if (!(searchResponse as any).success) {
             throw new Error(`Firecrawl search failed: ${JSON.stringify(searchResponse)}`);
         }
 
-        return (searchResponse as any).data.map((result: any) => ({
+        const results = (searchResponse as any).data || [];
+
+        return results.map((result: any) => ({
             title: result.title || "Untitled",
             url: result.url,
-            content: result.markdown || result.description || "",
+            // Fallback to description/snippet if markdown is missing (no scrapeOptions)
+            content: result.markdown || result.description || result.snippet || "",
         }));
 
     } catch (error) {
-        console.error("Firecrawl Error:", error);
-        return [];
+        console.error("Firecrawl Error details:", error);
+        throw error; // Rethrow to handle in API route
     }
 }
