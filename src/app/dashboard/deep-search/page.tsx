@@ -44,12 +44,13 @@ export default function DeepSearchPage() {
                     { role: "assistant", content: data.answer, sources: data.sources },
                 ]);
             } else {
-                throw new Error("Search failed");
+                const data = await res.json();
+                throw new Error(data.error || "Search failed");
             }
-        } catch (err) {
+        } catch (err: any) {
             setMessages((prev) => [
                 ...prev,
-                { role: "assistant", content: "I encountered an error searching the web. Please try again." },
+                { role: "assistant", content: `Error: ${err.message}. Please check if your Firecrawl API key is valid and you have remaining credits.` },
             ]);
         } finally {
             setLoading(false);
@@ -96,8 +97,8 @@ export default function DeepSearchPage() {
                         {messages.map((msg, idx) => (
                             <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                                 <div className={`max-w-[85%] rounded-3xl p-6 shadow-2xl ${msg.role === "user"
-                                        ? "bg-violet-600 text-white rounded-br-none"
-                                        : "bg-white/5 border border-white/10 text-gray-200 rounded-bl-none backdrop-blur-xl"
+                                    ? "bg-violet-600 text-white rounded-br-none"
+                                    : "bg-white/5 border border-white/10 text-gray-200 rounded-bl-none backdrop-blur-xl"
                                     }`}>
                                     <div className="whitespace-pre-wrap text-lg leading-relaxed">{msg.content}</div>
 
