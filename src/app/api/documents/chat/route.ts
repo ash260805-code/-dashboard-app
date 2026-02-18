@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import Groq from "groq-sdk";
+import { generateEmbedding, generateAnswer } from "@/lib/ai";
+import { searchAndScrape } from "@/lib/firecrawl";
+import { cosineSimilarity } from "@/lib/vector";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+// Types for Context
+interface ContextItem {
+    id: string;
+    content: string;
+    source: string; // "Document: Filename" or "Web: Title"
+    score?: number;
+}
 
 export async function POST(req: NextRequest) {
     try {
@@ -12,61 +20,90 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { message, documentId } = await req.json();
+        const { message, documentId, includeWebSearch } = await req.json();
 
         if (!message || !documentId) {
             return NextResponse.json({ error: "Missing message or documentId" }, { status: 400 });
         }
 
-        // 1. Retrieval Step: Find relevant chunks
-        // Simplified RAG: We use keyword matching since we don't have a vector extension yet.
-        // For a true RAG in serverless without PgVector, we retrieve the most recent chunks 
-        // or filter by keyword.
-        const chunks = await prisma.documentChunk.findMany({
-            where: {
-                documentId: documentId,
-                document: {
-                    userId: session.user.id // Security check
-                },
-                content: {
-                    contains: message.split(" ")[0], // Very basic keyword match for logic example
-                    mode: 'insensitive'
-                }
-            },
-            take: 5,
+        // 1. Fetch document chunks and embeddings
+        const doc = await prisma.document.findUnique({
+            where: { id: documentId, userId: session.user.id },
+            include: { chunks: true },
         });
 
-        // Fallback: If no keyword match, just take any chunks from the document
-        const relevantChunks = chunks.length > 0 ? chunks : await prisma.documentChunk.findMany({
-            where: { documentId, document: { userId: session.user.id } },
-            take: 5,
-        });
+        if (!doc) {
+            return NextResponse.json({ error: "Document not found" }, { status: 404 });
+        }
 
-        const context = relevantChunks.map(c => c.content).join("\n\n---\n\n");
+        // 2. Generate Query Embedding
+        const queryEmbedding = await generateEmbedding(message);
 
-        // 2. Augmentation & Generation
-        const response = await groq.chat.completions.create({
-            model: "llama-3.3-70b-versatile",
-            messages: [
-                {
-                    role: "system",
-                    content: `You are a helpful assistant. Use the following pieces of context to answer the user's question. 
-                    If you don't know the answer based on the context, just say you don't know. 
-                    
-                    CONTEXT:
-                    ${context}`
-                },
-                {
-                    role: "user",
-                    content: message
-                }
-            ],
-            stream: false, // Keeping it simple for the first iteration
-        });
+        // 3. Rank Chunks (RAG)
+        const allChunks = doc.chunks.map((chunk) => ({
+            ...chunk,
+            embedding: (chunk as any).embedding_json ? JSON.parse((chunk as any).embedding_json) : [],
+        }));
+
+        const rankedChunks = allChunks
+            .map((chunk) => {
+                if (!chunk.embedding || chunk.embedding.length === 0) return null;
+                return {
+                    ...chunk,
+                    score: cosineSimilarity(queryEmbedding, chunk.embedding),
+                };
+            })
+            .filter((chunk) => chunk !== null && chunk.score > 0.3) // Filter low relevance
+            .sort((a, b) => b!.score - a!.score)
+            .slice(0, 5); // Top 5 chunks
+
+        const contextItems: ContextItem[] = rankedChunks.map((chunk) => ({
+            id: chunk!.id,
+            content: chunk!.content,
+            source: `Document: ${doc.name}`,
+            score: chunk!.score,
+        }));
+
+        // 4. Perform Deep Search (Firecrawl) if requested
+        if (includeWebSearch) {
+            console.log("Deep search enabled for Quick RAG...");
+            const webResults = await searchAndScrape(message);
+
+            const webContextItems: ContextItem[] = (webResults as any[]).map((result: any, idx: number) => ({
+                id: `web-${idx}`,
+                content: result.content.slice(0, 1000), // Limit web content length
+                source: `Web: ${result.title} (${result.url})`,
+                score: 1.0,
+            }));
+
+            contextItems.push(...webContextItems);
+        }
+
+        // 5. Construct Prompt
+        const contextText = contextItems
+            .map((item, index) => `[${index + 1}] Source: ${item.source}\nContent: ${item.content}\n`)
+            .join("\n---\n");
+
+        const prompt = `
+      You are an intelligent assistant built to answer questions based on the provided context (Document and Web Search results).
+      
+      Context:
+      ${contextText}
+
+      Question: ${message}
+
+      Answer the question using the context above. 
+      If the answer is found in the context, cite the source using the format [Source Name].
+      If the context doesn't contain enough information, say "I couldn't find the answer in the provided document."
+      Do not make up information.
+    `;
+
+        // 6. Generate Answer
+        const answer = await generateAnswer(prompt);
 
         return NextResponse.json({
-            answer: response.choices[0]?.message?.content || "No response generated.",
-            contextUsed: relevantChunks.length
+            answer,
+            sources: contextItems.map(item => item.source)
         });
 
     } catch (error: any) {

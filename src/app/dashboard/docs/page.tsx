@@ -16,6 +16,7 @@ export default function DocsPage() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
+    const [includeWebSearch, setIncludeWebSearch] = useState(false);
     const [successMsg, setSuccessMsg] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
 
@@ -76,7 +77,7 @@ export default function DocsPage() {
             const res = await fetch("/api/documents/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: userMsg, documentId }),
+                body: JSON.stringify({ message: userMsg, documentId, includeWebSearch }),
             });
 
             const text = await res.text();
@@ -189,7 +190,26 @@ export default function DocsPage() {
                         <div ref={chatEndRef} />
                     </div>
 
-                    <form onSubmit={handleSend} className="p-4 border-t border-white/10 bg-white/5">
+                    <form onSubmit={handleSend} className="p-4 border-t border-white/10 bg-white/5 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 transition-all">
+                                <input
+                                    type="checkbox"
+                                    checked={includeWebSearch}
+                                    onChange={(e) => setIncludeWebSearch(e.target.checked)}
+                                    className="rounded border-white/20 bg-slate-800 text-violet-500 focus:ring-violet-500"
+                                />
+                                <span>Enable Deep Search (Web)</span>
+                            </label>
+                            {includeWebSearch && (
+                                <span className="text-xs text-violet-400 font-medium animate-pulse flex items-center gap-1">
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.381z" clipRule="evenodd" />
+                                    </svg>
+                                    Powered by Firecrawl
+                                </span>
+                            )}
+                        </div>
                         <div className="flex gap-4">
                             <input
                                 type="text"
