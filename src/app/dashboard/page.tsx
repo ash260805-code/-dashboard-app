@@ -178,7 +178,7 @@ export default async function DashboardPage() {
                 </div>
 
                 {/* AI Tools Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     {/* YouTube Summarizer */}
                     <Link href="/dashboard/ai-tools" className="group">
                         <div className="h-full backdrop-blur-xl bg-gradient-to-br from-pink-500/10 via-violet-500/10 to-purple-500/10 border border-violet-500/30 rounded-2xl p-6 hover:border-violet-400/50 transition-all">
@@ -213,6 +213,26 @@ export default async function DashboardPage() {
                                     <p className="text-gray-400 text-sm">Manage docs & Deep Search</p>
                                 </div>
                                 <div className="mt-auto pt-4 flex items-center text-blue-400 text-sm font-medium group-hover:gap-2 transition-all">
+                                    Open Tool <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                                </div>
+                            </div>
+                        </div>
+                    </Link>
+
+                    {/* Document Q&A */}
+                    <Link href="/dashboard/docs" className="group">
+                        <div className="h-full backdrop-blur-xl bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-cyan-500/10 border border-emerald-500/30 rounded-2xl p-6 hover:border-emerald-400/50 transition-all">
+                            <div className="flex flex-col h-full">
+                                <div className="w-14 h-14 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center group-hover:scale-110 transition-transform mb-4">
+                                    <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-white mb-2">📄 Quick RAG</h2>
+                                    <p className="text-gray-400 text-sm">Simple single-doc chat</p>
+                                </div>
+                                <div className="mt-auto pt-4 flex items-center text-emerald-400 text-sm font-medium group-hover:gap-2 transition-all">
                                     Open Tool <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
                                 </div>
                             </div>
