@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import Link from "next/link";
 
 async function getStats() {
-    const [totalUsers, approvedUsers, pendingUsers, recentUsers] = await Promise.all([
+    const [totalUsers, approvedUsers, pendingUsers, recentUsers, recentWorkspaces] = await Promise.all([
         prisma.user.count(),
         prisma.user.count({
             where: { status: "APPROVED" },
@@ -16,6 +16,11 @@ async function getStats() {
             orderBy: { createdAt: "desc" },
             take: 10,
         }),
+        prisma.workspace.findMany({
+            orderBy: { updatedAt: "desc" },
+            take: 5,
+            include: { _count: { select: { documents: true } } }
+        }),
     ]);
 
     return {
@@ -23,6 +28,7 @@ async function getStats() {
         approvedUsers,
         pendingUsers,
         recentUsers,
+        recentWorkspaces,
     };
 }
 
