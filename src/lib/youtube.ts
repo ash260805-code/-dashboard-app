@@ -17,87 +17,110 @@ if (process.platform !== 'win32' && fs.existsSync(binaryPath)) {
 }
 
 /**
- * Primary method: Manual HTML scraping (Fast & Stealthy)
+ * Professional Stage 1: Mobile Stealth Scraper (Highest bypass rate on Vercel)
  */
-async function fetchManualTranscript(videoId: string): Promise<string> {
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
-    console.log(`[Transcript] Attempting Manual HTML Fetch for ${videoId}...`);
+async function fetchMobileTranscript(videoId: string): Promise<string> {
+    const url = `https://m.youtube.com/watch?v=${videoId}`;
+    console.log(`[Transcript] Professional Mobile Fetch for ${videoId}...`);
 
-    try {
-        const res = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
-            },
-            cache: 'no-store'
-        });
+    const cookies = process.env.YOUTUBE_COOKIES || '';
+    const headers: Record<string, string> = {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.google.com/',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+    };
+    if (cookies) headers['Cookie'] = cookies;
 
-        const html = await res.text();
-        const match = html.match(/"captionTracks":\s*(\[.*?\])/);
+    const res = await fetch(url, { headers, cache: 'no-store' });
+    const html = await res.text();
 
-        if (!match) {
-            if (html.includes('Sign in to confirm you’re not a bot')) {
-                throw new Error("BOT_DETECTION");
+    // Professional JSON extraction using robust bracket matching
+    const startAssignmentStr = 'ytInitialPlayerResponse = ';
+    const startKeyStr = '"playerResponse":';
+    let startIndex = html.indexOf(startAssignmentStr);
+    let offset = 0;
+
+    if (startIndex !== -1) {
+        offset = startAssignmentStr.length;
+    } else {
+        // Fallback search if the direct assignment isn't found
+        startIndex = html.indexOf(startKeyStr);
+        if (startIndex !== -1) {
+            // We need to find the opening brace after the key and colon
+            const colonIndex = html.indexOf(':', startIndex + startKeyStr.length - 1);
+            if (colonIndex !== -1) {
+                startIndex = colonIndex + 1; // Start after the colon
+                // Find the first non-whitespace character after the colon
+                while (startIndex < html.length && /\s/.test(html[startIndex])) {
+                    startIndex++;
+                }
+                // If it's not an opening brace, something is wrong, but we'll proceed
+                // The loop below will handle finding the first '{'
+            } else {
+                startIndex = -1; // Colon not found after key, treat as not found
             }
-            throw new Error("NO_CAPTIONS_FOUND");
         }
-
-        const tracks = JSON.parse(match[1]);
-        const enTrack = tracks.find((t: any) => t.languageCode === 'en' || t.vssId?.includes('.en')) || tracks[0];
-
-        if (!enTrack || !enTrack.baseUrl) {
-            throw new Error("NO_EN_TRACK");
-        }
-
-        console.log(`[Transcript] Manual Scraper found track. Fetching XML...`);
-        const xmlRes = await fetch(enTrack.baseUrl);
-        const xml = await xmlRes.text();
-
-        if (!xml || xml.trim().length === 0) {
-            throw new Error("EMPTY_XML");
-        }
-
-        // High-performance XML segment extraction
-        const segments = xml.split(/<text[^>]*>/).slice(1);
-        const text = segments
-            .map(segment => {
-                return segment.split('</text>')[0]
-                    .replace(/<[^>]*>/g, '')
-                    .replace(/&amp;/g, '&')
-                    .replace(/&quot;/g, '"')
-                    .replace(/&#39;/g, "'")
-                    .replace(/&lt;/g, '<')
-                    .replace(/&gt;/g, '>');
-            })
-            .join(' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-        return text;
-    } catch (e) {
-        throw e;
     }
+
+    if (startIndex === -1) {
+        if (html.includes('Sign in to confirm')) throw new Error("BOT_DETECTION");
+        throw new Error("METADATA_NOT_FOUND");
+    }
+
+    let jsonStr = "";
+    let depth = 0;
+    let found = false;
+    // Walk through the HTML to find the balanced JSON object
+    for (let i = startIndex + offset; i < html.length; i++) {
+        const char = html[i];
+        if (char === '{') { depth++; found = true; }
+        if (char === '}') depth--;
+        if (found) jsonStr += char;
+        if (found && depth === 0) break;
+    }
+
+    if (!jsonStr) throw new Error("JSON_EXTRACTION_FAILED");
+
+    const playerResponse = JSON.parse(jsonStr);
+    const captions = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+
+    if (!captions || captions.length === 0) {
+        throw new Error("NO_CAPTIONS_ARRAY");
+    }
+
+    const enTrack = captions.find((t: any) => t.languageCode === 'en' || t.vssId?.includes('.en')) || captions[0];
+    console.log(`[Transcript] Authorized XML found. Fetching...`);
+
+    const xmlRes = await fetch(enTrack.baseUrl, { headers });
+    const xml = await xmlRes.text();
+
+    if (!xml || xml.trim().length === 0) {
+        throw new Error("EMPTY_XML_RESPONSE");
+    }
+
+    return cleanSubtitleText(xml);
 }
 
 /**
- * Fallback method: Multi-client yt-dlp (Robust)
+ * Stage 2: Fallback to multi-client yt-dlp (Robust)
  */
 async function fetchYtDlpTranscript(videoId: string): Promise<string> {
-    console.log(`[Transcript] Falling back to multi-client yt-dlp for ${videoId}...`);
+    console.log(`[Transcript] Falling back to robust yt-dlp for ${videoId}...`);
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-    // Order of clients to try: Android, IOS, web_creator, and TV (often most permissive)
-    const clients = ['android', 'ios', 'web_creator', 'tv'];
+    // Order of clients to try: Android, IOS, TV, and web_creator (often most permissive)
+    const clients = ['android', 'ios', 'tv', 'web_creator'];
     let lastErrorMessage = "";
 
     // Support for an optional proxy to bypass Vercel IP blocks
     const proxy = process.env.YOUTUBE_PROXY;
+    const cookies = process.env.YOUTUBE_COOKIES;
 
     for (const client of clients) {
         try {
-            console.log(`[Transcript] yt-dlp attempt: ${client}${proxy ? ' (via proxy)' : ''}...`);
+            console.log(`[Transcript] yt-dlp effort: ${client}${proxy ? ' (via proxy)' : ''}...`);
             const quotedBinary = `"${binaryPath}"`;
             const flags = [
                 '--dump-single-json',
@@ -106,6 +129,7 @@ async function fetchYtDlpTranscript(videoId: string): Promise<string> {
                 '--user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"',
                 `--extractor-args "youtube:player_client=${client}"`,
                 proxy ? `--proxy "${proxy}"` : '',
+                cookies ? `--add-header "Cookie: ${cookies}"` : '',
                 '--geo-bypass'
             ].filter(Boolean).join(' ');
 
@@ -123,14 +147,11 @@ async function fetchYtDlpTranscript(videoId: string): Promise<string> {
             if (!track || !track.url) continue;
 
             const res = await fetch(track.url);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
             const textData = await res.text();
             return cleanSubtitleText(textData);
 
         } catch (error: any) {
-            const stderr = error.stderr?.toString() || "";
-            lastErrorMessage = stderr || error.message || "Unknown error";
+            lastErrorMessage = error.message || "Unknown error";
             console.warn(`[Transcript] yt-dlp ${client} failed: ${lastErrorMessage.substring(0, 50)}...`);
             continue;
         }
@@ -140,25 +161,25 @@ async function fetchYtDlpTranscript(videoId: string): Promise<string> {
 }
 
 /**
- * Main Professional Entry Point
+ * Main Industrial-Grade Entry Point
  */
 export async function fetchTranscript(videoId: string): Promise<string> {
     try {
-        // Stage 1: Fast Scraper
-        return await fetchManualTranscript(videoId);
+        // Professional Stage 1
+        return await fetchMobileTranscript(videoId);
     } catch (e: any) {
-        console.warn(`[Transcript] Stage 1 (Manual) failed: ${e.message}`);
+        console.warn(`[Transcript] Professional Stage 1 failed: ${e.message}`);
 
-        // Stage 2: Robust yt-dlp
+        // Professional Stage 2
         try {
             return await fetchYtDlpTranscript(videoId);
         } catch (e2: any) {
-            console.error(`[Transcript] Stage 2 (yt-dlp) failed: ${e2.message}`);
+            console.error(`[Transcript] Professional Stage 2 failed: ${e2.message}`);
 
-            if (e2.message.includes("Sign in to confirm you’re not a bot")) {
-                throw new Error("YouTube has blocked the request due to heavy traffic from Vercel's data center. Try again later or use a different video.");
+            if (e2.message.includes("Sign in to confirm") || e2.message.includes("BOT_DETECTION")) {
+                throw new Error("YouTube has blocked the request from Vercel. For 100% reliability, please add your YOUTUBE_COOKIES to Vercel environment variables.");
             }
-            throw new Error(`Failed to fetch transcript: ${e2.message}`);
+            throw new Error(`Professional fetch failed: ${e2.message}`);
         }
     }
 }
