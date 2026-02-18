@@ -134,89 +134,132 @@ export default async function DashboardPage() {
                     </div>
                 </div>
 
-                {/* AI Tools Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    {/* YouTube Summarizer */}
-                    <Link href="/dashboard/ai-tools" className="group">
-                        <div className="h-full backdrop-blur-xl bg-gradient-to-br from-pink-500/10 via-violet-500/10 to-purple-500/10 border border-violet-500/30 rounded-2xl p-6 hover:border-violet-400/50 transition-all">
-                            <div className="flex flex-col h-full">
-                                <div className="w-14 h-14 rounded-xl bg-gradient-to-tr from-pink-500 to-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform mb-4">
-                                    <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-white mb-2">🎥 YouTube AI</h2>
-                                    <p className="text-gray-400 text-sm">Paste a link → Get summary & notes</p>
-                                </div>
-                                <div className="mt-auto pt-4 flex items-center text-violet-400 text-sm font-medium group-hover:gap-2 transition-all">
-                                    Open Tool <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
-                                </div>
-                            </div>
-                        </div>
-                    </Link>
+        </div>
 
-                    {/* AI Workspaces */}
-                    <Link href="/workspaces" className="group">
-                        <div className="h-full backdrop-blur-xl bg-gradient-to-br from-blue-500/10 via-cyan-500/10 to-teal-500/10 border border-blue-500/30 rounded-2xl p-6 hover:border-blue-400/50 transition-all">
-                            <div className="flex flex-col h-full">
-                                <div className="w-14 h-14 rounded-xl bg-gradient-to-tr from-blue-500 to-cyan-600 flex items-center justify-center group-hover:scale-110 transition-transform mb-4">
-                                    <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-white mb-2">🧠 AI Workspaces</h2>
-                                    <p className="text-gray-400 text-sm">Manage docs & Deep Search</p>
-                                </div>
-                                <div className="mt-auto pt-4 flex items-center text-blue-400 text-sm font-medium group-hover:gap-2 transition-all">
-                                    Open Tool <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
-                                </div>
-                            </div>
+                {/* Status: Recent Workspaces */ }
+    <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-white">My Workspaces</h2>
+            <Link
+                href="/workspaces"
+                className="px-4 py-2 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-500 transition-all flex items-center gap-2"
+            >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Create Workspace
+            </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {stats.recentWorkspaces.map((workspace) => (
+                <Link href={`/workspaces/${workspace.id}`} key={workspace.id} className="group">
+                    <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-violet-500/50 transition-all h-full">
+                        <h3 className="text-lg font-bold text-white mb-2 group-hover:text-violet-400 transition-colors">{workspace.name}</h3>
+                        <div className="flex items-center gap-4 text-sm text-gray-400">
+                            <span className="flex items-center gap-1">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                {workspace._count.documents} Docs
+                            </span>
+                            <span>•</span>
+                            <span>Updated {new Date(workspace.updatedAt).toLocaleDateString()}</span>
                         </div>
-                    </Link>
+                    </div>
+                </Link>
+            ))}
+            {stats.recentWorkspaces.length === 0 && (
+                <div className="col-span-full py-8 text-center text-gray-400 border border-dashed border-white/10 rounded-2xl">
+                    No workspaces found. Create one to get started!
                 </div>
+            )}
+        </div>
+    </div>
 
-
-                {/* Recent Users */}
-                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
-                    <h2 className="text-xl font-bold text-white mb-4">Recent Users</h2>
-                    <div className="space-y-4">
-                        {stats.recentUsers.map((user) => (
-                            <div key={user.id} className="flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.status === "APPROVED" ? "bg-emerald-500/20 text-emerald-300" :
-                                    user.status === "PENDING" ? "bg-amber-500/20 text-amber-300" :
-                                        "bg-red-500/20 text-red-300"
-                                    }`}>
-                                    {user.name ? user.name.charAt(0).toUpperCase() : "U"}
-                                </div>
-                                <div className="flex-1">
-                                    <p className="text-white font-medium">
-                                        {user.name || "Unnamed User"}
-                                    </p>
-                                    <p className="text-gray-400 text-sm">
-                                        {user.email} · Joined {new Date(user.createdAt).toLocaleDateString()}
-                                    </p>
-                                </div>
-                                <div className={`px-3 py-1 rounded-full text-xs border ${user.role === "ADMIN" ? "bg-violet-500/20 text-violet-300 border-violet-500/30" :
-                                    "bg-blue-500/20 text-blue-300 border-blue-500/30"
-                                    }`}>
-                                    {user.role}
-                                </div>
-                                <div className={`px-3 py-1 rounded-full text-xs border ${user.status === "APPROVED" ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" :
-                                    user.status === "PENDING" ? "bg-amber-500/20 text-amber-300 border-amber-500/30" :
-                                        "bg-red-500/20 text-red-300 border-red-500/30"
-                                    }`}>
-                                    {user.status}
-                                </div>
-                            </div>
-                        ))}
-                        {stats.recentUsers.length === 0 && (
-                            <p className="text-gray-400 text-center py-4">No users found</p>
-                        )}
+    {/* AI Tools Grid */ }
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {/* YouTube Summarizer */}
+        <Link href="/dashboard/ai-tools" className="group">
+            <div className="h-full backdrop-blur-xl bg-gradient-to-br from-pink-500/10 via-violet-500/10 to-purple-500/10 border border-violet-500/30 rounded-2xl p-6 hover:border-violet-400/50 transition-all">
+                <div className="flex flex-col h-full">
+                    <div className="w-14 h-14 rounded-xl bg-gradient-to-tr from-pink-500 to-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform mb-4">
+                        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-white mb-2">🎥 YouTube AI</h2>
+                        <p className="text-gray-400 text-sm">Paste a link → Get summary & notes</p>
+                    </div>
+                    <div className="mt-auto pt-4 flex items-center text-violet-400 text-sm font-medium group-hover:gap-2 transition-all">
+                        Open Tool <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
                     </div>
                 </div>
-            </main>
+            </div>
+        </Link>
+
+        {/* AI Workspaces */}
+        <Link href="/workspaces" className="group">
+            <div className="h-full backdrop-blur-xl bg-gradient-to-br from-blue-500/10 via-cyan-500/10 to-teal-500/10 border border-blue-500/30 rounded-2xl p-6 hover:border-blue-400/50 transition-all">
+                <div className="flex flex-col h-full">
+                    <div className="w-14 h-14 rounded-xl bg-gradient-to-tr from-blue-500 to-cyan-600 flex items-center justify-center group-hover:scale-110 transition-transform mb-4">
+                        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-white mb-2">🧠 AI Workspaces</h2>
+                        <p className="text-gray-400 text-sm">Manage docs & Deep Search</p>
+                    </div>
+                    <div className="mt-auto pt-4 flex items-center text-blue-400 text-sm font-medium group-hover:gap-2 transition-all">
+                        Open Tool <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                    </div>
+                </div>
+            </div>
+        </Link>
+    </div>
+
+
+    {/* Recent Users */ }
+    <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
+        <h2 className="text-xl font-bold text-white mb-4">Recent Users</h2>
+        <div className="space-y-4">
+            {stats.recentUsers.map((user) => (
+                <div key={user.id} className="flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.status === "APPROVED" ? "bg-emerald-500/20 text-emerald-300" :
+                        user.status === "PENDING" ? "bg-amber-500/20 text-amber-300" :
+                            "bg-red-500/20 text-red-300"
+                        }`}>
+                        {user.name ? user.name.charAt(0).toUpperCase() : "U"}
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-white font-medium">
+                            {user.name || "Unnamed User"}
+                        </p>
+                        <p className="text-gray-400 text-sm">
+                            {user.email} · Joined {new Date(user.createdAt).toLocaleDateString()}
+                        </p>
+                    </div>
+                    <div className={`px-3 py-1 rounded-full text-xs border ${user.role === "ADMIN" ? "bg-violet-500/20 text-violet-300 border-violet-500/30" :
+                        "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                        }`}>
+                        {user.role}
+                    </div>
+                    <div className={`px-3 py-1 rounded-full text-xs border ${user.status === "APPROVED" ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" :
+                        user.status === "PENDING" ? "bg-amber-500/20 text-amber-300 border-amber-500/30" :
+                            "bg-red-500/20 text-red-300 border-red-500/30"
+                        }`}>
+                        {user.status}
+                    </div>
+                </div>
+            ))}
+            {stats.recentUsers.length === 0 && (
+                <p className="text-gray-400 text-center py-4">No users found</p>
+            )}
         </div>
+    </div>
+            </main >
+        </div >
     );
 }
