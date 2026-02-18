@@ -22,11 +22,13 @@ export async function searchAndScrape(query: string) {
             limit: 5
         } as any);
 
-        if (!(searchResponse as any).success) {
-            throw new Error(`Firecrawl search failed: ${JSON.stringify(searchResponse)}`);
-        }
+        // Some versions/responses from Firecrawl might not have 'success' flag 
+        // but still contain results under 'data' or 'web'.
+        const results = (searchResponse as any).data || (searchResponse as any).web || [];
 
-        const results = (searchResponse as any).data || [];
+        if (!(searchResponse as any).success && results.length === 0) {
+            throw new Error(`Firecrawl search failed or returned no results: ${JSON.stringify(searchResponse)}`);
+        }
 
         return results.map((result: any) => ({
             title: result.title || "Untitled",
