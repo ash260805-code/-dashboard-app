@@ -16,7 +16,7 @@ async function getStats() {
             orderBy: { createdAt: "desc" },
             take: 10,
         }),
-        prisma.workspace.findMany({
+        (prisma as any).workspace.findMany({
             orderBy: { updatedAt: "desc" },
             take: 5,
             include: { _count: { select: { documents: true } } }
@@ -152,7 +152,7 @@ export default async function DashboardPage() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {stats.recentWorkspaces.map((workspace) => (
+                        {stats.recentWorkspaces.map((workspace: any) => (
                             <Link href={`/workspaces/${workspace.id}`} key={workspace.id} className="group">
                                 <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-violet-500/50 transition-all h-full">
                                     <h3 className="text-lg font-bold text-white mb-2 group-hover:text-violet-400 transition-colors">{workspace.name}</h3>
@@ -225,7 +225,7 @@ export default async function DashboardPage() {
                 <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
                     <h2 className="text-xl font-bold text-white mb-4">Recent Users</h2>
                     <div className="space-y-4">
-                        {stats.recentUsers.map((user) => (
+                        {stats.recentUsers.map((user: any) => (
                             <div key={user.id} className="flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.status === "APPROVED" ? "bg-emerald-500/20 text-emerald-300" :
                                     user.status === "PENDING" ? "bg-amber-500/20 text-amber-300" :
